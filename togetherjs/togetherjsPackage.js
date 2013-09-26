@@ -6602,7 +6602,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
     }
   });
 
-  Cursor._cursors = {};
+  /*Cursor._cursors = {};
 
   cursor.getClient = Cursor.getClient = function (clientId) {
     var c = Cursor._cursors[clientId];
@@ -6629,7 +6629,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
   peers.on("new-peer identity-updated status-updated", function (peer) {
     var c = Cursor.getClient(peer.id);
     c.updatePeer(peer);
-  });
+  });*/
 
   var lastTime = 0;
   var MIN_TIME = 100;

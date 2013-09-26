@@ -6842,7 +6842,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
         return;
       }
 
-      var location = elementFinder.elementLocation(element);
+      /*var location = elementFinder.elementLocation(element);
       var offset = $(element).offset();
       var offsetX = event.pageX - offset.left;
       var offsetY = event.pageY - offset.top;
@@ -6852,7 +6852,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
         offsetX: offsetX,
         offsetY: offsetY
       });
-      //displayClick({top: event.pageY, left: event.pageX}, peers.Self.color);
+      displayClick({top: event.pageY, left: event.pageX}, peers.Self.color);*/
     });
   }
 

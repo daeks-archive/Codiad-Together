@@ -554,7 +554,7 @@ input.togetherjs-upload-avatar {
   background: #fff;
   border-right: 1px solid rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-  z-index: 10002;
+  z-index: 100002;
   box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
 }
 .togetherjs #togetherjs-window-pointer-right {
@@ -570,7 +570,7 @@ input.togetherjs-upload-avatar {
   background-color: #ffffff;
   color: #000000;
   padding: 0 7px 0 7px;
-  z-index: 10001;
+  z-index: 100001;
   width: 286px;
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
@@ -690,7 +690,7 @@ input.togetherjs-upload-avatar {
   background-color: #ffffff;
   color: #000000;
   padding: 0 7px 0 7px;
-  z-index: 10001;
+  z-index: 100001;
   width: 300px;
   border-radius: 4px;
   background: rgba(242, 242, 242, 0.9);
@@ -972,7 +972,7 @@ input.togetherjs-upload-avatar {
   position: fixed;
   font-size: 14px;
   background-color: #fff;
-  z-index: 10003;
+  z-index: 100003;
   border: 1px solid #979797;
   border-radius: 4px;
 }
@@ -1138,7 +1138,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 /* Button set */
 #togetherjs-dock {
   position: fixed;
-  z-index: 1000000;
+  z-index: 100000;
   background-color: #474747;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   /*border:1px solid #000;*/
@@ -1211,7 +1211,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 .togetherjs-arrow {
   position: absolute;
   border: 2px solid #f00;
-  z-index: 10010;
+  z-index: 100010;
   padding: 0;
   margin: 0;
   -moz-transform-origin: top left;
@@ -1242,7 +1242,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 }
 .togetherjs-cursor {
   position: absolute;
-  z-index: 9999;
+  z-index: 99990;
   font-size: 28px;
   font-weight: bolder;
   /* This magic CSS rule makes this element basically invisible to clicks/etc:
@@ -1315,7 +1315,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 }
 .togetherjs-click {
   position: absolute;
-  z-index: 9998;
+  z-index: 99980;
   pointer-events: none;
   width: 10px;
   height: 10px;
@@ -1354,19 +1354,19 @@ section.togetherjs-buttons .togetherjs-same-url {
   height: 100%;
   top: 0;
   left: 0;
-  z-index: 10002;
+  z-index: 100002;
 }
 .togetherjs .togetherjs-modal {
   background-color: #ffffff;
   color: #000000;
   padding: 0 7px 0 7px;
-  z-index: 10001;
+  z-index: 100001;
   width: 286px;
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   border-radius: 5px !important;
   position: fixed;
-  z-index: 10003;
+  z-index: 100003;
   top: 50%;
   left: 50%;
   margin-left: -150px;
@@ -1790,7 +1790,7 @@ section.togetherjs-buttons .togetherjs-same-url {
   position: absolute;
   margin-top: 25px;
   background-color: #fff;
-  z-index: 10004;
+  z-index: 100004;
   border: 1px solid #979797;
   border-radius: 4px;
   padding: 5px;
@@ -1817,7 +1817,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 .togetherjs-focus {
   position: absolute;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 99990;
   opacity: 0.4;
   border: 3px solid;
   margin: -3px;
@@ -1911,7 +1911,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     margin-left: 0;
     height: 82%;
     margin-top: 0%;
-    z-index: 10003 !important;
+    z-index: 100003 !important;
     top: 20%;
     left: -2px;
   }
@@ -1999,7 +1999,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     background: #fff;
     border-right: 1px solid rgba(0, 0, 0, 0.2);
     border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-    z-index: 10002;
+    z-index: 100002;
     box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
   }
   #togetherjs-window-pointer-right {
@@ -2209,7 +2209,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     margin-left: 0;
     height: 82%;
     margin-top: 0%;
-    z-index: 10003 !important;
+    z-index: 100003 !important;
     top: 20%;
     left: -2px;
   }
@@ -2324,7 +2324,7 @@ section.togetherjs-buttons .togetherjs-same-url {
   margin-left: 0;
   height: 82%;
   margin-top: 0%;
-  z-index: 10003 !important;
+  z-index: 100003 !important;
   top: 20%;
   left: -2px;
 }
@@ -2412,7 +2412,7 @@ section.togetherjs-buttons .togetherjs-same-url {
   background: #fff;
   border-right: 1px solid rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-  z-index: 10002;
+  z-index: 100002;
   box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
 }
 .togetherjs-mobile-browser #togetherjs-window-pointer-right {
@@ -2621,7 +2621,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     margin-left: 0;
     height: 82%;
     margin-top: 0%;
-    z-index: 10003 !important;
+    z-index: 100003 !important;
     top: 20%;
     left: -2px;
   }

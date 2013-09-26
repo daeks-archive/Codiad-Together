@@ -144,11 +144,11 @@ http://yuilibrary.com/license/
   font-weight: normal;
 }
 .togetherjs a {
-  color: #0095DD;
+  color: #474747;
   text-decoration: none;
 }
 .togetherjs a:hover {
-  color: #0095DD;
+  color: #474747;
   text-decoration: underline;
 }
 .togetherjs p {
@@ -406,7 +406,7 @@ input.togetherjs-upload-avatar {
 }
 .togetherjs #togetherjs-buttons #togetherjs-audio-button:hover {
   background-image: url('./images/button-mic-active.png');
-  /*background-color:#0095dd;*/
+  /*background-color:#474747;*/
 
   /*cursor: default;*/
 
@@ -475,7 +475,7 @@ input.togetherjs-upload-avatar {
   font-family: openSansLight;
 }
 .togetherjs #togetherjs-chat-input:focus {
-  border: 1px solid #0095DD;
+  border: 1px solid #474747;
 }
 .togetherjs #togetherjs-chat-input-box {
   margin: 0;
@@ -586,7 +586,7 @@ input.togetherjs-upload-avatar {
   margin: 0 -7px 0 -7px;
   padding: 10px 4px 5px 30px;
   height: 24px;
-  background: #0095DD;
+  background: #474747;
   border-radius: 4px 4px 0 0;
   position: relative;
   border-bottom: 1px solid #0071A7;
@@ -602,7 +602,7 @@ input.togetherjs-upload-avatar {
   margin: 7px 0px;
 }
 .togetherjs .togetherjs-window .togetherjs-share-link:focus {
-  border: 1px solid #0095DD;
+  border: 1px solid #474747;
 }
 .togetherjs .togetherjs-window header button.togetherjs-close {
   background-color: inherit;
@@ -642,7 +642,7 @@ input.togetherjs-upload-avatar {
   margin: 0 -1px 0 -1px;
   padding: 10px 4px 5px 30px;
   height: 24px;
-  background: #0095DD;
+  background: #474747;
   border-radius: 4px 4px 0 0;
   position: relative;
   border-bottom: 1px solid #0071A7;
@@ -710,7 +710,7 @@ input.togetherjs-upload-avatar {
   margin: 0 -7px 0 -7px;
   padding: 10px 4px 5px 30px;
   height: 24px;
-  background: #0095DD;
+  background: #474747;
   border-radius: 4px 4px 0 0;
   position: relative;
   border-bottom: 1px solid #0071A7;
@@ -726,7 +726,7 @@ input.togetherjs-upload-avatar {
   margin: 7px 0px;
 }
 .togetherjs .togetherjs-notification .togetherjs-share-link:focus {
-  border: 1px solid #0095DD;
+  border: 1px solid #474747;
 }
 .togetherjs .togetherjs-notification header button.togetherjs-close {
   background-color: inherit;
@@ -1062,10 +1062,10 @@ input.togetherjs-upload-avatar {
   margin: -2px 0px;
 }
 #togetherjs-menu .togetherjs-self-name:focus {
-  border: 1px solid #0095DD;
+  border: 1px solid #474747;
 }
 #togetherjs-menu .togetherjs-self-name:focus {
-  border-bottom: 1px solid #0095DD;
+  border-bottom: 1px solid #474747;
 }
 /*Participant windows*/
 section.togetherjs-participant-window-main {
@@ -1138,7 +1138,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 #togetherjs-dock {
   position: fixed;
   z-index: 10000;
-  background-color: #0095dd;
+  background-color: #474747;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   /*border:1px solid #000;*/
 
@@ -1384,7 +1384,7 @@ section.togetherjs-buttons .togetherjs-same-url {
   margin: 0 -7px 0 -7px;
   padding: 10px 4px 5px 30px;
   height: 24px;
-  background: #0095DD;
+  background: #474747;
   border-radius: 4px 4px 0 0;
   position: relative;
   border-bottom: 1px solid #0071A7;
@@ -1400,7 +1400,7 @@ section.togetherjs-buttons .togetherjs-same-url {
   margin: 7px 0px;
 }
 .togetherjs .togetherjs-modal .togetherjs-share-link:focus {
-  border: 1px solid #0095DD;
+  border: 1px solid #474747;
 }
 .togetherjs .togetherjs-modal header button.togetherjs-close {
   background-color: inherit;
@@ -1673,7 +1673,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: inset 0 0 2px #0095dd;
+    box-shadow: inset 0 0 2px #474747;
   }
   100% {
     box-shadow: none;
@@ -1684,7 +1684,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: inset 0 0 2px #0095dd;
+    box-shadow: inset 0 0 2px #474747;
   }
   100% {
     box-shadow: none;
@@ -1695,7 +1695,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: inset 0 0 2px #0095dd;
+    box-shadow: inset 0 0 2px #474747;
   }
   100% {
     box-shadow: none;
@@ -1706,7 +1706,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: inset 0 0 2px #0095dd;
+    box-shadow: inset 0 0 2px #474747;
   }
   100% {
     box-shadow: none;
@@ -1723,7 +1723,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: 0 0 5px #0095dd;
+    box-shadow: 0 0 5px #474747;
   }
   100% {
     box-shadow: none;
@@ -1734,7 +1734,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: 0 0 5px #0095dd;
+    box-shadow: 0 0 5px #474747;
   }
   100% {
     box-shadow: none;
@@ -1745,7 +1745,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: 0 0 5px #0095dd;
+    box-shadow: 0 0 5px #474747;
   }
   100% {
     box-shadow: none;
@@ -1756,7 +1756,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: 0 0 5px #0095dd;
+    box-shadow: 0 0 5px #474747;
   }
   100% {
     box-shadow: none;

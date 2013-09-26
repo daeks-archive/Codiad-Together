@@ -25,11 +25,11 @@
         //////////////////////////////////////////////////////////////////
 
         init: function () {
-          TogetherJSConfig_getUserName = function () {return 'User Name';};
+          TogetherJSConfig_getUserName = function () {return 'Codiad Username';};
           //TogetherJSConfig_getUserAvatar = function () {return avatarUrl;};
-          TogetherJSConfig_getUserColor = function () {return '#ff00ff';};
+          //TogetherJSConfig_getUserColor = function () {return '#ff00ff';};
           TogetherJSConfig_suppressJoinConfirmation = true;
-          TogetherJSConfig_suppressInvite = true;
+          //TogetherJSConfig_suppressInvite = true;
           TogetherJSConfig_siteName = "Plugin";
           TogetherJSConfig_toolName = "Plugin";
           TogetherJS();

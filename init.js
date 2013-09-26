@@ -41,7 +41,7 @@
                     TogetherJSConfig_getUserAvatar = function () {return curpath+'avatar.jpg';};
                     TogetherJSConfig_getUserColor = function () {return '#fff';};
                     TogetherJSConfig_suppressJoinConfirmation = true;
-                    //TogetherJSConfig_suppressInvite = true;
+                    TogetherJSConfig_suppressInvite = true;
                     TogetherJSConfig_siteName = "Codiad Together";
                     TogetherJSConfig_toolName = "Codiad Together";
                     TogetherJS();

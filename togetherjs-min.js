@@ -241,9 +241,9 @@
       }
     }
     if (min) {
-      addScript("libs/togetherjsPackage.js");
+      addScript("togetherjs/togetherjsPackage.js");
     } else {
-      addScript("libs/require.js");
+      addScript("togetherjs/require.js");
     }
   };
 

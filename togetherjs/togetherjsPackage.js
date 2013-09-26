@@ -6783,7 +6783,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
 
   session.on("ui-ready", function () {
     $(document).mousemove(mousemove);
-    //document.addEventListener("click", documentClick, true);
+    document.addEventListener("click", documentClick, true);
     document.addEventListener("keydown", documentKeydown, true);
     $(window).scroll(scroll);
     scroll();
@@ -6794,7 +6794,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
       Cursor.destroy(clientId);
     });
     $(document).unbind("mousemove", mousemove);
-    //document.removeEventListener("click", documentClick, true);
+    document.removeEventListener("click", documentClick, true);
     document.removeEventListener("keydown", documentKeydown, true);
     $(window).unbind("scroll", scroll);
   });
@@ -6852,7 +6852,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
         offsetX: offsetX,
         offsetY: offsetY
       });
-      displayClick({top: event.pageY, left: event.pageX}, peers.Self.color);
+      //displayClick({top: event.pageY, left: event.pageX}, peers.Self.color);
     });
   }
 

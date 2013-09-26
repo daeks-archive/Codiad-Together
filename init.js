@@ -27,6 +27,10 @@
         //////////////////////////////////////////////////////////////////
 
         init: function () {
+        
+        },
+
+        load: function () {
             var _this = this;
             var currentResponse = null;
             $.ajax({

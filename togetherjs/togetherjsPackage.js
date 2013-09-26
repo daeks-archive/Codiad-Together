@@ -2287,7 +2287,7 @@ define('templates',["util"], function (util) {
     // Removes <% /* ... */ %> comments:
     t = t.replace(/[<][%]\s*\/\*[\S\s\r\n]*\*\/\s*[%][>]/, "");
     t = util.trim(t);
-    t = t.replace(/http:\/\/localhost:8080\/togetherjs\//g, TogetherJS.baseUrl);
+    t = t.replace(/http:\/\/localhost:8080/g, TogetherJS.baseUrl);
     return t;
   }
   return {

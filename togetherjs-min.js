@@ -8,9 +8,9 @@
   var scripts= document.getElementsByTagName('script'),
       path = scripts[scripts.length-1].src.split('?')[0],
       curpath = path.split('/').slice(0, -1).join('/')+'/';
-  var styleSheet =  "screen.css";
+  var styleSheet =  "/togetherjs/togetherjs.css";
 
-  var baseUrl = curpath;
+  var baseUrl = path.split('/').slice(0, -1).join('/');
   if (baseUrl == "__" + "baseUrl__") {
     // Reset the variable if it doesn't get substituted
     baseUrl = "";
@@ -241,9 +241,9 @@
       }
     }
     if (min) {
-      addScript("togetherjs/togetherjsPackage.js");
+      addScript("/togetherjs/togetherjsPackage.js");
     } else {
-      addScript("togetherjs/require.js");
+      addScript("/togetherjs/libs/require.js");
     }
   };
 

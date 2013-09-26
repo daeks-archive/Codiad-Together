@@ -44,6 +44,7 @@
                     TogetherJSConfig_suppressInvite = true;
                     TogetherJSConfig_siteName = "Codiad Together";
                     TogetherJSConfig_toolName = "Codiad Together";
+                    TogetherJSConfig_findRoom = btoa(window.location.href);
                     TogetherJS();
                 } 
              });

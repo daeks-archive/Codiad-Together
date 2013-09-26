@@ -1147,7 +1147,8 @@ section.togetherjs-buttons .togetherjs-same-url {
 #togetherjs-dock.togetherjs-dock-right {
   padding: 0;
   bottom: 150px;
-  right: 5px;
+  right: 15px;
+  bottom: 25px;
   border-radius: 4px;
   height: 260px;
   width: 60px;

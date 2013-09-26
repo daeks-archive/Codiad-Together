@@ -11,7 +11,7 @@
         path = scripts[scripts.length-1].src.split('?')[0],
         curpath = path.split('/').slice(0, -1).join('/')+'/';
         
-    $.getScript('https://togetherjs.com/togetherjs-min.js');    
+    $.getScript(curpath+'togetherjs-min.js');    
 
     $(window)
         .load(function() {

@@ -8,9 +8,9 @@
   var scripts= document.getElementsByTagName('script'),
       path = scripts[scripts.length-1].src.split('?')[0],
       curpath = path.split('/').slice(0, -1).join('/')+'/';
-  var styleSheet =  curpath + "screen.css";
+  var styleSheet =  "screen.css";
 
-  var baseUrl = "https://togetherjs.com";
+  var baseUrl = curpath;
   if (baseUrl == "__" + "baseUrl__") {
     // Reset the variable if it doesn't get substituted
     baseUrl = "";
@@ -105,7 +105,7 @@
       var link = document.createElement("link");
       link.id = "togetherjs-stylesheet";
       link.setAttribute("rel", "stylesheet");
-      link.href = styleSheet + "?bust=" + cacheBust;
+      link.href = baseUrl + styleSheet + "?bust=" + cacheBust;
       document.head.appendChild(link);
     }
   }
@@ -241,9 +241,9 @@
       }
     }
     if (min) {
-      addScript("/togetherjs/togetherjsPackage.js");
+      addScript("libs/togetherjsPackage.js");
     } else {
-      addScript("/togetherjs/libs/require.js");
+      addScript("libs/require.js");
     }
   };
 

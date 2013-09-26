@@ -382,14 +382,14 @@ input.togetherjs-upload-avatar {
   border-top: 1px solid rgba(0, 0, 0, 0.2);
 }
 .togetherjs #togetherjs-buttons .togetherjs-button:hover {
-  background-color: #0F81BF;
+  background-color: #474747;
 }
 .togetherjs #togetherjs-buttons hr {
   padding: 0;
   margin: 0;
 }
 .togetherjs #togetherjs-dock-participants button.togetherjs-active {
-  background-color: #0F81BF !important;
+  background-color: #474747 !important;
 }
 .togetherjs #togetherjs-buttons #togetherjs-share-button {
   background-image: url('./images/button-share.png');
@@ -399,7 +399,7 @@ input.togetherjs-upload-avatar {
 }
 .togetherjs #togetherjs-buttons #togetherjs-share-button.togetherjs-active {
   background-image: url('./images/button-share-active.png') !important;
-  background-color: #0F81BF;
+  background-color: #474747;
 }
 .togetherjs #togetherjs-buttons #togetherjs-audio-button {
   background-image: url('./images/button-mic.png');
@@ -413,7 +413,7 @@ input.togetherjs-upload-avatar {
 }
 .togetherjs #togetherjs-buttons #togetherjs-audio-button.togetherjs-active {
   background-image: url('./images/button-mic-active.png') !important;
-  background-color: #0F81BF;
+  background-color: #474747;
 }
 .togetherjs #togetherjs-buttons #togetherjs-chat-button {
   background-image: url('./images/button-chat.png');
@@ -423,7 +423,7 @@ input.togetherjs-upload-avatar {
 }
 .togetherjs #togetherjs-buttons #togetherjs-chat-button.togetherjs-active {
   background-image: url('./images/button-chat-active.png') !important;
-  background-color: #0F81BF;
+  background-color: #474747;
 }
 .togetherjs #togetherjs-dock-anchor {
   height: 20px;

@@ -6794,7 +6794,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
       Cursor.destroy(clientId);
     });
     $(document).unbind("mousemove", mousemove);
-    document.removeEventListener("click", documentClick, true);
+    //document.removeEventListener("click", documentClick, true);
     document.removeEventListener("keydown", documentKeydown, true);
     $(window).unbind("scroll", scroll);
   });

@@ -48,6 +48,15 @@
                     TogetherJS();
                 } 
              });
+        },
+        
+        handle: function (target) {
+          var css = $(target).attr("class");
+          if(css == 'close') {
+            codiad.active.remove($(target).parent('li').attr('data-path'));
+          } else {
+            codiad.filemanager.openFile($(target).attr("data-path"));
+          }
         }
     };
 

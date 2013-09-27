@@ -6602,7 +6602,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
     }
   });
 
-  /*Cursor._cursors = {};
+  Cursor._cursors = {};
 
   cursor.getClient = Cursor.getClient = function (clientId) {
     var c = Cursor._cursors[clientId];
@@ -6629,7 +6629,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
   peers.on("new-peer identity-updated status-updated", function (peer) {
     var c = Cursor.getClient(peer.id);
     c.updatePeer(peer);
-  });*/
+  });
 
   var lastTime = 0;
   var MIN_TIME = 100;
@@ -6842,7 +6842,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
         return;
       }
 
-      /*var location = elementFinder.elementLocation(element);
+      var location = elementFinder.elementLocation(element);
       var offset = $(element).offset();
       var offsetX = event.pageX - offset.left;
       var offsetY = event.pageY - offset.top;
@@ -6852,9 +6852,17 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
         offsetX: offsetX,
         offsetY: offsetY
       });
-      displayClick({top: event.pageY, left: event.pageX}, peers.Self.color);*/
+      session.send({
+        type: "codiad",
+        element: location
+      });
+      //displayClick({top: event.pageY, left: event.pageX}, peers.Self.color);
     });
   }
+  
+  session.hub.on("codiad", function (data) {
+    codiad.together.handle($(elementFinder.findElement(data.element)));
+  });
 
   var CLICK_TRANSITION_TIME = 3000;
 
@@ -6889,7 +6897,8 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
     element.css({
       top: pos.top,
       left: pos.left,
-      borderColor: color
+      borderColor: color,
+      'z-index': '999998'
     });
     setTimeout(function () {
       element.addClass("togetherjs-clicking");

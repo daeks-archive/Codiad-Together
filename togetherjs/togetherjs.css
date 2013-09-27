@@ -1243,7 +1243,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 }
 .togetherjs-cursor {
   position: absolute;
-  z-index: 9999;
+  z-index: 999999;
   font-size: 28px;
   font-weight: bolder;
   /* This magic CSS rule makes this element basically invisible to clicks/etc:
@@ -1316,7 +1316,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 }
 .togetherjs-click {
   position: absolute;
-  z-index: 9998;
+  z-index: 999998;
   pointer-events: none;
   width: 10px;
   height: 10px;

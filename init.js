@@ -21,6 +21,7 @@
     codiad.together = {
     
         controller: curpath + 'controller.php',
+        tmp: '',
 
         //////////////////////////////////////////////////////////////////
         // Initilization
@@ -29,36 +30,46 @@
         init: function () {
           if(typeof(TogetherJS) != 'undefined') {
             amplify.subscribe('active.onOpen', function(path) {
+              codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'active.onOpen', path: path});
             });
             amplify.subscribe('active.onFocus', function(path) {
+              codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'active.onFocus', path: path});
             });
             amplify.subscribe('active.onSave', function(path) {
+              codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'active.onSave', path: path});
             });
             amplify.subscribe('active.onRemoveAll', function() {
-              TogetherJS.send({type: "codiad", action: 'active.onRemoveAll', path: null});
+              codiad.together.tmp = 'nopath';
+              TogetherJS.send({type: "codiad", action: 'active.onRemoveAll', path: 'nopath'});
             });
-            amplify.subscribe('active.onRename', function(oldPath, newPath) {
+            /*amplify.subscribe('active.onRename', function(oldPath, newPath) {
+              codiad.together.tmp = oldPath;
               TogetherJS.send({type: "codiad", action: 'active.onRename', oldpath: oldPath, newpath: newPath});
-            });
+            });*/
             amplify.subscribe('active.onClose', function(path) {
+              codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'active.onClose', path: path});
             });
             
             amplify.subscribe('project.onOpen', function(path) {
+              codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'project.onOpen', path: path});
             });
-            amplify.subscribe('project.onCreate', function(name, path, git_repo, git_branch) {
+            /*amplify.subscribe('project.onCreate', function(name, path, git_repo, git_branch) {
+              codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'project.onCreate', path: path});
             });
             amplify.subscribe('project.onRename', function(name, path) {
+              codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'project.onRename', path: path});
             });
             amplify.subscribe('project.onDelete', function(name, path) {
+              codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'project.onDelete', path: path});
-            });
+            });*/
           }
         },
         
@@ -91,21 +102,25 @@
         //////////////////////////////////////////////////////////////////
         
         handle: function (target) {
-          if(target.action == 'active.onOpen') {
-            //codiad.filemanager.openFile(target.path);
-          }
-          if(target.action == 'active.onClose') {
-             //codiad.active.remove(target.path);
-          }
-          if(target.action == 'active.onFocus') {
-             //codiad.active.focus(target.path);
-          }
-          if(target.action == 'active.onRemoveAll') {
-             //codiad.active.removeAll();
-          }
-          
-          if(target.action == 'project.onOpen') {
-             //codiad.project.open(target.path);
+          if(codiad.together.tmp !== target.path) {
+            if(target.action == 'active.onOpen') {
+              codiad.filemanager.openFile(target.path, true);
+            }
+            if(target.action == 'active.onClose') {
+               codiad.active.remove(target.path, false);
+            }
+            if(target.action == 'active.onFocus') {
+               codiad.active.focus(target.path, true, false);
+            }
+            if(target.action == 'active.onRemoveAll') {
+               codiad.active.removeAll(false);
+            }
+            
+            if(target.action == 'project.onOpen') {
+               codiad.project.open(target.path, false);
+            }
+          } else {
+            codiad.together.tmp = '';
           }
         }
     };

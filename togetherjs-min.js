@@ -700,6 +700,7 @@
         TogetherJS();
       }
     }
+    codiad.together.init();
   }
 
   conditionalActivate();

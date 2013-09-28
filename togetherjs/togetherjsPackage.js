@@ -6852,16 +6852,12 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
         offsetX: offsetX,
         offsetY: offsetY
       });
-      session.send({
-        type: "codiad",
-        element: location
-      });
       //displayClick({top: event.pageY, left: event.pageX}, peers.Self.color);
     });
   }
   
-  session.hub.on("codiad", function (data) {
-    codiad.together.handle($(elementFinder.findElement(data.element)));
+  session.hub.on("app.codiad", function (data) {
+    codiad.together.handle(data);
   });
 
   var CLICK_TRANSITION_TIME = 3000;

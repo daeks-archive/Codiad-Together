@@ -45,10 +45,6 @@
               codiad.together.tmp = 'nopath';
               TogetherJS.send({type: "codiad", action: 'active.onRemoveAll', path: 'nopath'});
             });
-            /*amplify.subscribe('active.onRename', function(oldPath, newPath) {
-              codiad.together.tmp = oldPath;
-              TogetherJS.send({type: "codiad", action: 'active.onRename', oldpath: oldPath, newpath: newPath});
-            });*/
             amplify.subscribe('active.onClose', function(path) {
               codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'active.onClose', path: path});

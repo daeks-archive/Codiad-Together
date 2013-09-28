@@ -92,10 +92,20 @@
         
         handle: function (target) {
           if(target.action == 'active.onOpen') {
-            codiad.filemanager.openFile(target.path);
+            //codiad.filemanager.openFile(target.path);
           }
           if(target.action == 'active.onClose') {
-             codiad.active.remove(target.path);
+             //codiad.active.remove(target.path);
+          }
+          if(target.action == 'active.onFocus') {
+             //codiad.active.focus(target.path);
+          }
+          if(target.action == 'active.onRemoveAll') {
+             //codiad.active.removeAll();
+          }
+          
+          if(target.action == 'project.onOpen') {
+             //codiad.project.open(target.path);
           }
         }
     };

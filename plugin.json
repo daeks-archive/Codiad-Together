@@ -2,7 +2,7 @@
     "version": "0.1e",
     "name" : "Codiad Together",
     "url" : "https://github.com/daeks/Codiad-Together",
-    "requires" : "9cc20f49ee1be315157a1859dc1c174d7750ed47",
+    "requires" : "73cad0e875d2c0950a829abd3fcc0674d60015c5",
     "rightbar" : [{
         "action" : "codiad.together.load();",
         "icon" : "icon-users",

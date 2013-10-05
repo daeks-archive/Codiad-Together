@@ -1,8 +1,8 @@
 [ { "author" : "daeks",
-    "version": "0.1ee",
+    "version": "0.1e",
     "name" : "Codiad Together",
     "url" : "https://github.com/daeks/Codiad-Together",
-    "requires" : "ad1097190b428839d8b3999963c67429b14225a8",
+    "requires" : "fd1097190b428839d8b3999963c67429b14225a8",
     "rightbar" : [{
         "action" : "codiad.together.load();",
         "icon" : "icon-users",

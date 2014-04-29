@@ -15,7 +15,7 @@
 
     $(window)
         .load(function() {
-            //codiad.together.init();
+            codiad.together.init();
         });
 
     codiad.together = {

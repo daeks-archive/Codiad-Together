@@ -29,7 +29,7 @@
 
         init: function () {
           if(typeof(TogetherJS) != 'undefined') {
-            amplify.subscribe('active.onOpen', function(path) {
+            /*amplify.subscribe('active.onOpen', function(path) {
               codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'active.onOpen', path: path});
             });
@@ -53,7 +53,7 @@
             amplify.subscribe('project.onOpen', function(path) {
               codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'project.onOpen', path: path});
-            });
+            });*/
             /*amplify.subscribe('project.onCreate', function(name, path, git_repo, git_branch) {
               codiad.together.tmp = path;
               TogetherJS.send({type: "codiad", action: 'project.onCreate', path: path});

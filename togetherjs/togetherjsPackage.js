@@ -923,6 +923,19 @@ define('util',["jquery", "jqueryPlugins"], function ($) {
     return lastBase + url;
   };
 
+  util.assertValidUrl = function (url) {
+    /* This does some simple assertions that the url is valid:
+       - it must be a string
+       - it must be http(s)://... or data:...
+       - it must not contain a space, quotation, or close paren
+    */
+    util.assert(typeof url == "string", "URLs must be a string:", url);
+    util.assert(url.search(/^(http:\/\/|https:\/\/|\/\/|data:)/i) === 0,
+                "URL must have an http, https, data, or // scheme:", url);
+    util.assert(url.search(/[\)\'\"\ ]/) === -1,
+                "URLs cannot contain ), ', \", or spaces:", JSON.stringify(url));
+  };
+
   util.resolver = function (deferred, func) {
     util.assert(deferred.then, "Bad deferred:", deferred);
     util.assert(typeof func == "function", "Not a function:", func);
@@ -1041,6 +1054,20 @@ define('util',["jquery", "jqueryPlugins"], function ($) {
     });
   };
 
+  util.matchElement = function(el, selector) {
+    var res = selector;
+    if (selector === true || ! selector) {
+      return !!selector;
+    }
+    try {
+      return $(el).is(selector);
+    } catch (e) {
+      console.warn("Bad selector:", selector, "error:", e);
+      return false;
+    }
+
+  };
+
   util.testExpose = function (objs) {
     if (typeof TogetherJSTestSpy == "undefined") {
       return;
@@ -1057,8 +1084,10 @@ define('analytics',["util"], function (util) {
   var analytics = util.Module("analytics");
 
   analytics.activate = function () {
-    var enable = TogetherJS.getConfig("enableAnalytics");
-    var code = TogetherJS.getConfig("analyticsCode");
+    var enable = TogetherJS.config.get("enableAnalytics");
+    var code = TogetherJS.config.get("analyticsCode");
+    TogetherJS.config.close("enableAnalytics");
+    TogetherJS.config.close("analyticsCode");
     if (! (enable && code)) {
       return;
     }
@@ -1609,20 +1638,19 @@ define('storage',["util"], function (util) {
         value = JSON.stringify(value);
       }
       return Deferred(function (def) {
-        setTimeout(util.resolver(def, function () {
-          key = self.prefix + key;
-          if (value === undefined) {
-            self.storage.removeItem(key);
-            if (DEBUG_STORAGE) {
-              console.debug("Delete storage", key);
-            }
-          } else {
-            self.storage.setItem(key, value);
-            if (DEBUG_STORAGE) {
-              console.debug("Set storage", key, value);
-            }
+        key = self.prefix + key;
+        if (value === undefined) {
+          self.storage.removeItem(key);
+          if (DEBUG_STORAGE) {
+            console.debug("Delete storage", key);
           }
-        }));
+        } else {
+          self.storage.setItem(key, value);
+          if (DEBUG_STORAGE) {
+            console.debug("Set storage", key, value);
+          }
+        }
+        setTimeout(def.resolve);
       });
     },
 
@@ -1650,7 +1678,7 @@ define('storage',["util"], function (util) {
         setTimeout(util.resolver(def, function () {
           prefix = prefix || "";
           var result = [];
-          for (var i=0; i<self.storage.length; i++) {
+          for (var i = 0; i < self.storage.length; i++) {
             var key = self.storage.key(i);
             if (key.indexOf(self.prefix + prefix) === 0) {
               var shortKey = key.substr(self.prefix.length);
@@ -1671,7 +1699,8 @@ define('storage',["util"], function (util) {
 
   });
 
-  var namePrefix = TogetherJS.getConfig("storagePrefix");
+  var namePrefix = TogetherJS.config.get("storagePrefix");
+  TogetherJS.config.close("storagePrefix");
 
   var storage = Storage('localStorage', localStorage, namePrefix + ".");
 
@@ -1702,6 +1731,7 @@ define('storage',["util"], function (util) {
 define('session',["require", "util", "channels", "jquery", "storage"], function (require, util, channels, $, storage) {
 
   var DEBUG = true;
+
   // This is the amount of time in which a hello-back must be received after a hello
   // for us to respect a URL change:
   var HELLO_BACK_CUTOFF = 1500;
@@ -1733,11 +1763,19 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
   /****************************************
    * URLs
    */
+  var includeHashInUrl = TogetherJS.config.get("includeHashInUrl");
+  TogetherJS.config.close("includeHashInUrl");
+  var currentUrl = (location.href + "").replace(/\#.*$/, "");
+  if (includeHashInUrl) {
+    currentUrl = location.href;
+  }
 
   session.hubUrl = function (id) {
     id = id || session.shareId;
     assert(id, "URL cannot be resolved before TogetherJS.shareId has been initialized");
-    return TogetherJS.getConfig("hubBase").replace(/\/*$/, "") + "/hub/" + id;
+    TogetherJS.config.close("hubBase");
+    var hubBase = TogetherJS.config.get("hubBase");
+    return hubBase.replace(/\/*$/, "") + "/hub/" + id;
   };
 
   session.shareUrl = function () {
@@ -1756,18 +1794,18 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
 
   session.recordUrl = function () {
     assert(session.shareId);
-    var url = TogetherJS.baseUrl.replace(/\/*$/, "") + "/recorder.html";
-    url += "#&togetherjs=" + session.shareId + "&hubBase=" + TogetherJS.getConfig("hubBase");
+    var url = TogetherJS.baseUrl.replace(/\/*$/, "") + "/togetherjs/recorder.html";
+    url += "#&togetherjs=" + session.shareId + "&hubBase=" + TogetherJS.config.get("hubBase");
     return url;
   };
 
   /* location.href without the hash */
   session.currentUrl = function () {
-    return location.href.replace(/#.*/, "");
-  };
-
-  session.siteName = function () {
-    return TogetherJS.getConfig("siteName") || document.title;
+    if (includeHashInUrl) {
+      return location.href;
+    } else {
+      return location.href.replace(/#.*/, "");
+    }
   };
 
   /****************************************
@@ -1776,7 +1814,11 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
 
   session.hub = util.mixinEvents({});
 
-  var IGNORE_MESSAGES = ["cursor-update", "keydown", "scroll-update"];
+  var IGNORE_MESSAGES = TogetherJS.config.get("ignoreMessages");
+  if (IGNORE_MESSAGES === true) {
+    DEBUG = false;
+    IGNORE_MESSAGES = [];
+  }
   // These are messages sent by clients who aren't "part" of the TogetherJS session:
   var MESSAGES_WITHOUT_CLIENTID = ["who", "invite", "init-connection"];
 
@@ -1826,9 +1868,6 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
     channel = c;
     session.router.bindChannel(channel);
   }
-
-  // FIXME: once we start looking at window.history we need to update this:
-  var currentUrl = (location.href + "").replace(/\#.*$/, "");
 
   session.send = function (msg) {
     if (DEBUG && IGNORE_MESSAGES.indexOf(msg.type) == -1) {
@@ -1916,7 +1955,6 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
     session.emit("prepare-hello", msg);
     return msg;
   };
-
   /****************************************
    * Lifecycle (start and end)
    */
@@ -1925,10 +1963,10 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
   // be injected at runtime because they aren't pulled in naturally
   // via define().
   // ui must be the first item:
-  var features = ["peers", "ui", "chat", "webrtc", "cursor", "startup","videos", "forms", "visibilityApi"];
+  var features = ["peers", "ui", "chat", "webrtc", "cursor", "startup", "videos", "forms", "visibilityApi", "youtubeVideos"];
 
   function getRoomName(prefix, maxSize) {
-    var findRoom = TogetherJS.getConfig("hubBase").replace(/\/*$/, "") + "/findroom";
+    var findRoom = TogetherJS.config.get("hubBase").replace(/\/*$/, "") + "/findroom";
     return $.ajax({
       url: findRoom,
       dataType: "json",
@@ -1986,8 +2024,9 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
         }
       }
       return storage.tab.get("status").then(function (saved) {
-        var findRoom = TogetherJS.getConfig("findRoom");
-        if (findRoom && saved) {
+        var findRoom = TogetherJS.config.get("findRoom");
+        TogetherJS.config.close("findRoom");
+        if (findRoom && saved && findRoom != saved.shareId) {
           console.info("Ignoring findRoom in lieu of continued session");
         } else if (findRoom && TogetherJS.startup._joinShareId) {
           console.info("Ignoring findRoom in lieu of explicit invite to session");
@@ -2070,7 +2109,6 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
       }
     });
   }
-
   session.start = function () {
     initStartTarget();
     initIdentityId().then(function () {
@@ -2090,7 +2128,8 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
                 startup.start();
               });
               ui.activateUI();
-              if (TogetherJS.getConfig("enableAnalytics")) {
+              TogetherJS.config.close("enableAnalytics");
+              if (TogetherJS.config.get("enableAnalytics")) {
                 require(["analytics"], function (analytics) {
                   analytics.activate();
                 });
@@ -2132,13 +2171,26 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
     });
   };
 
-
   session.on("start", function () {
     $(window).on("resize", resizeEvent);
+    if (includeHashInUrl) {
+      $(window).on("hashchange", hashchangeEvent);
+    }
   });
+
   session.on("close", function () {
     $(window).off("resize", resizeEvent);
+    if (includeHashInUrl) {
+      $(window).off("hashchange", hashchangeEvent);
+    }
   });
+
+  function hashchangeEvent() {
+    // needed because when message arives from peer this variable will be checked to
+    // decide weather to show actions or not
+    sendHello(false);
+  }
+
   function resizeEvent() {
     session.emit("resize");
   }
@@ -2159,128 +2211,6 @@ define('session',["require", "util", "channels", "jquery", "storage"], function 
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
-define('appsync',["util", "session"], function (util, session) {
-  var appsync = util.Module("visibilityApi");
-  var assert = util.assert;
-
-  var activeSyncers = [];
-
-  appsync.Syncer = util.Class({
-    constructor: function (name, methods) {
-      this.name = name;
-      this.methods = methods;
-      this.initMessage = this.initMessage.bind(this);
-      this.updateMessage = this.updateMessage.bind(this);
-      this.helloMessage = this.helloMessage.bind(this);
-    },
-    register: function () {
-      TogetherJS.hub.on(this.name + "-init", this.initMessage);
-      TogetherJS.hub.on(this.name + "-update", this.updateMessage);
-      TogetherJS.hub.on("towtruck.hello", this.helloMessage);
-      this.methods.init.call(this);
-      activeSyncers.push(this);
-    },
-    unregister: function () {
-      this.methods.uninit.call(this);
-      var pos = activeSyncers.indexOf(this);
-      assert(pos != -1);
-      activeSyncers.splice(pos, 1);
-    },
-
-    helloMessage: function (msg) {
-      if (! msg.sameUrl) {
-        return;
-      }
-      var idUpdates = {};
-      var anonUpdates = [];
-      var promises = [];
-      util.forEachAttr(this.methods.getters || {}, function (getter, type) {
-        var updates = getter();
-        updates = util.makePromise(updates);
-        var typeUpdate = updates.then(function (value) {
-          if (! Array.isArray(value)) {
-            value = [value];
-          }
-          value.forEach(function (v) {
-            if (! v.type) {
-              v.type = type;
-            }
-          });
-          return value;
-        });
-        promises.push(typeUpdate);
-      });
-      util.resolveMany(promises, function (results) {
-        var values = [];
-        results.forEach(function (result) {
-          result.forEach(function (o) {
-            // FIXME: check for required properties
-            values.push(o);
-          });
-          TogetherJS.send({
-            type: this.name + "-init",
-            updates: values
-          });
-        });
-      });
-    },
-
-    initMessage: function (msg, noClear) {
-      if (! msg.sameUrl) {
-        return;
-      }
-      var initTypes = {};
-      for (var i=0; i<msg.updates.length; i++) {
-        var item = msg.updates[i];
-        if (item.type && ! this.methods['update_' + item.type]) {
-          console.warn("Received an update with a type", item.type, "and no update_" + item.type + " method");
-        } else if (item.type) {
-          if ((! noClear) && ! initTypes.hasOwnProperty(item.type)) {
-            this.methods['clear_' + item.type].call(this);
-            initTypes[item.type] = null;
-          }
-          var method = this.methods['update_' + item.type];
-          method.call(this, item);
-        } else {
-          this.methods.incoming.call(this, item);
-        }
-      }
-    },
-
-    updateMessage: function (msg) {
-      this.initMessage(msg);
-    },
-
-    update: function (item) {
-      if (! Array.isArray(item)) {
-        item = [item];
-      }
-      TogetherJS.send({
-        type: this.name + "-update",
-        updates: item
-      });
-    }
-  });
-
-  session.on("close", function () {
-    activeSyncers.slice().forEach(function (syncer) {
-      syncer.unregister();
-    });
-  });
-
-  session.on("ui-ready", function () {
-    util.forEachAttr(TogetherJS.getConfig("appsyncers"), function (methods, name) {
-      var s = appsync.Syncer(name, methods);
-      s.register();
-    });
-  });
-
-  return appsync;
-});
-
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this file,
- * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 define('templates',["util"], function (util) {
   function clean(t) {
@@ -2291,7 +2221,7 @@ define('templates',["util"], function (util) {
     return t;
   }
   return {
-    "interface": clean("<div id=\"togetherjs-container\" class=\"togetherjs\">\n\n  <!-- This is the main set of buttons: -->\n  <div id=\"togetherjs-dock\" class=\"togetherjs-dock-right\">\n    <div id=\"togetherjs-dock-anchor\" title=\"Move the dock\">\n      <span id=\"togetherjs-dock-anchor-horizontal\">\n        <img src=\"http://localhost:8080/togetherjs/images/icn-handle-circle@2x.png\" alt=\"drag\">\n      </span>\n      <span id=\"togetherjs-dock-anchor-vertical\">\n        <img src=\"http://localhost:8080/togetherjs/images/icn-handle-circle@2x.png\" alt=\"drag\">\n      </span>\n    </div>\n    <div id=\"togetherjs-buttons\">\n      <div style=\"display: none\">\n        <button id=\"togetherjs-template-dock-person\" class=\"togetherjs-button togetherjs-dock-person\">\n          <div class=\"togetherjs-tooltip togetherjs-dock-person-tooltip\">\n            <span class=\"togetherjs-person-name\"></span>\n            <span class=\"togetherjs-person-tooltip-arrow-r\"></span>\n          </div>\n          <div class=\"togetherjs-person togetherjs-person-status-overlay\"></div>\n        </button>\n      </div>\n      <button id=\"togetherjs-profile-button\" class=\"togetherjs-button\" title=\"This is you\">\n        <div class=\"togetherjs-person togetherjs-person-self\"></div>\n        <div id=\"togetherjs-profile-arrow\"></div>\n      </button>\n      <button id=\"togetherjs-share-button\" class=\"togetherjs-button\" title=\"Add a friend\"></button>\n      <button id=\"togetherjs-audio-button\" class=\"togetherjs-button\" title=\"Turn on microphone\">\n        <span id=\"togetherjs-audio-unavailable\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\">\n        </span>\n        <span id=\"togetherjs-audio-ready\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n        <span id=\"togetherjs-audio-outgoing\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n        <span id=\"togetherjs-audio-incoming\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n        <span id=\"togetherjs-audio-active\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n        <span id=\"togetherjs-audio-muted\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n        <span id=\"togetherjs-audio-error\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n      </button>\n      <button id=\"togetherjs-chat-button\" class=\"togetherjs-button\" title=\"Chat\"></button>\n      <div id=\"togetherjs-dock-participants\"></div>\n      <div id=\"togetherjs-dock-participants-overload\"></div>\n    </div>\n  </div>\n\n  <!-- The window for editing the avatar: -->\n  <div id=\"togetherjs-avatar-edit\" class=\"togetherjs-modal\"\n       style=\"display: none\">\n    <header> Update avatar </header>\n    <section>\n      <div class=\"togetherjs-avatar-preview togetherjs-person togetherjs-person-self\"></div>\n      <div id=\"togetherjs-avatar-buttons\">\n        <input type=\"file\" class=\"togetherjs-upload-avatar\">\n        <!--<button id=\"togetherjs-upload-avatar\" class=\"togetherjs-primary\">Upload a picture</button>-->\n        <!--<button id=\"togetherjs-camera-avatar\" class=\"togetherjs-default\">Take a picture</button>-->\n      </div>\n    </section>\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-cancel togetherjs-dismiss\">Cancel</button>\n      <span class=\"togetherjs-alt-text\">or</span>\n      <button class=\"togetherjs-avatar-save togetherjs-primary\">Save</button>\n    </section>\n  </div>\n\n  <!-- The window for sharing the link: -->\n  <div id=\"togetherjs-share\" class=\"togetherjs-window\"\n       data-bind-to=\"#togetherjs-share-button\" style=\"display: none\">\n    <header> Invite a friend </header>\n    <section>\n      <div class=\"togetherjs-not-mobile\">\n        <p>Copy and paste this link over IM or email:</p>\n        <input type=\"text\" class=\"togetherjs-share-link\">\n      </div>\n      <div class=\"togetherjs-only-mobile\">\n        <p>Copy and paste this link over IM or email:</p>\n        <input type=\"text\" class=\"togetherjs-share-link\">\n        <!-- <a class=\"togetherjs-share-link\" href=\"#\">Press your thumb here.</a> -->\n      </div>\n    </section>\n  </div>\n\n  <!-- Participant detail template: -->\n  <div id=\"togetherjs-template-participant-window\" class=\"togetherjs-window\" style=\"display: none\">\n    <header><div class=\"togetherjs-person togetherjs-person-small\"></div><span class=\"togetherjs-person-name\"></span></header>\n\n    <section class=\"togetherjs-participant-window-main\">\n      <p class=\"togetherjs-participant-window-row\"><strong>Role:</strong>\n        <span class=\"togetherjs-person-role\"></span>\n      </p>\n\n      <p class=\"togetherjs-participant-window-row\"><strong>Currently at:</strong>\n        <a class=\"togetherjs-person-url togetherjs-person-url-title\"></a>\n      </p>\n\n      <p class=\"togetherjs-participant-window-row\"><strong>Status:</strong>\n        <span class=\"togetherjs-person-status\"></span>\n      </p>\n\n      <p class=\"togetherjs-participant-window-row\"><strong class=\"togetherjs-float-left\">Follow this participant:</strong>\n        <label class=\"togetherjs-follow-question togetherjs-float-left\" for=\"togetherjs-person-status-follow\">\n          <input type=\"checkbox\" id=\"togetherjs-person-status-follow\">\n        </label>\n        <span class=\"togetherjs-clear\"></span>\n      </p>\n\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <!-- Displayed when the peer is at a different URL: -->\n      <div class=\"togetherjs-different-url\">\n        <a class=\"togetherjs-nudge togetherjs-default\">Nudge them</a>\n        <a href=\"#\" class=\"togetherjs-follow togetherjs-person-url togetherjs-primary\">Join them</a>\n      </div>\n      <!-- Displayed when the peer is at your same URL: -->\n      <div class=\"togetherjs-same-url\" style=\"display: none\">\n        <span class=\"togetherjs-person-name\"></span> is on the same page as you.\n      </div>\n    </section>\n  </div>\n\n  <!-- The chat screen: -->\n  <div id=\"togetherjs-chat\" class=\"togetherjs-window\" data-bind-to=\"#togetherjs-chat-button\"\n       style=\"display: none\">\n    <header> Chat </header>\n    <section class=\"togetherjs-subtitle\">\n      <div id=\"togetherjs-chat-participants\" data-toggles=\"#togetherjs-chat-no-participants\" style=\"display: none\">\n        <span id=\"togetherjs-chat-participant-list\"></span>\n        &amp; You\n      </div>\n      <div id=\"togetherjs-chat-no-participants\" data-toggles=\"#togetherjs-chat-participants\">\n        No one else is here.\n      </div>\n    </section>\n\n    <div style=\"display: none\">\n\n      <!-- Template for one message: -->\n      <div id=\"togetherjs-template-chat-message\" class=\"togetherjs-chat-item togetherjs-chat-message\">\n        <div class=\"togetherjs-person\"></div>\n        <div class=\"togetherjs-timestamp\"><span class=\"togetherjs-time\">HH:MM</span> <span class=\"togetherjs-ampm\">AM/PM</span></div>\n        <div class=\"togetherjs-person-name-abbrev\"></div>\n        <div class=\"togetherjs-chat-content togetherjs-sub-content\"></div>\n      </div>\n\n      <!-- Template for when a person leaves: -->\n      <div id=\"togetherjs-template-chat-left\" class=\"togetherjs-chat-item togetherjs-chat-left-item\">\n        <div class=\"togetherjs-person\"></div>\n        <div class=\"togetherjs-ifnot-declinedJoin\">\n          <div class=\"togetherjs-inline-text\"><span class=\"togetherjs-person-name\"></span> left the session.</div>\n        </div>\n        <div class=\"togetherjs-if-declinedJoin\">\n          <div class=\"togetherjs-inline-text\"><span class=\"togetherjs-person-name\"></span> declined to join the session.</div>\n        </div>\n        <div class=\"togetherjs-clear\"></div>\n      </div>\n\n      <!-- Template when a person joins the session: -->\n      <div id=\"togetherjs-template-chat-joined\" class=\"togetherjs-chat-item togetherjs-chat-join-item\">\n        <div class=\"togetherjs-person\"></div>\n        <div class=\"togetherjs-inline-text\"><span class=\"togetherjs-person-name\"></span> joined the session.</div>\n        <div class=\"togetherjs-clear\"></div>\n      </div>\n\n      <!-- Template for system-derived messages: -->\n      <div id=\"togetherjs-template-chat-system\" class=\"togetherjs-chat-item\">\n        <span class=\"togetherjs-chat-content togetherjs-sub-content\"></span>\n      </div>\n\n      <!-- Template when a person joins the session: -->\n      <!-- <div id=\"togetherjs-template-chat-joined\" class=\"togetherjs-chat-item togetherjs-chat-join-item\">\n        <div class=\"togetherjs-person\"></div>\n        <div class=\"togetherjs-inline-text\"><span class=\"togetherjs-person-name\"></span> joined the session.</div>\n        <div class=\"togetherjs-clear\"></div>\n      </div> -->\n\n      <!-- Template for when someone goes to a new URL: -->\n      <div id=\"togetherjs-template-url-change\" class=\"togetherjs-chat-item togetherjs-chat-url-change\">\n        <div class=\"togetherjs-person\"></div>\n        <div class=\"togetherjs-inline-text\">\n          <div class=\"togetherjs-if-sameUrl\">\n            <span class=\"togetherjs-person-name\"></span>\n            is on the same page as you.\n          </div>\n          <div class=\"togetherjs-ifnot-sameUrl\">\n            <span class=\"togetherjs-person-name\"></span>\n            has gone to: <a href=\"#\" class=\"togetherjs-person-url togetherjs-person-url-title\" target=\"_self\"></a>\n            <section class=\"togetherjs-buttons togetherjs-buttons-notification-diff-url\">\n              <!-- Displayed when the peer is at a different URL: -->\n              <div class=\"togetherjs-different-url togetherjs-notification-diff-url\">\n                <a class=\"togetherjs-nudge togetherjs-default\">Nudge them</a>\n                <a href=\"#\" class=\"togetherjs-follow togetherjs-person-url togetherjs-primary\">Join them</a>\n              </div>\n            </section>\n\n            <!-- <div>\n              <a class=\"togetherjs-nudge togetherjs-secondary\">Nudge them</a>\n              <a href=\"\" class=\"togetherjs-person-url togetherjs-follow togetherjs-primary\">Join them</a>\n            </div> -->\n\n          </div>\n        </div>\n        <div class=\"togetherjs-clear\"></div>\n      </div>\n    </div>\n\n    <section id=\"togetherjs-chat-messages\">\n      <!-- FIX ME// need to have some dialogue that says something like - There are no chats yet! -->\n    </section>\n    <section id=\"togetherjs-chat-input-box\">\n      <input type=\"text\" id=\"togetherjs-chat-input\" placeholder=\"Type your message here\">\n    </section>\n  </div>\n\n  <!-- this is a kind of warning popped up when you (successfully) start RTC: -->\n  <div id=\"togetherjs-rtc-info\" class=\"togetherjs-window\"\n       data-bind-to=\"#togetherjs-audio-button\"\n       style=\"display: none\">\n\n    <header> Audio Chat </header>\n    <section>\n      <p>\n        Activate your <strong>browser microphone</strong> near your URL bar above.\n      </p>\n      <p>\n        Talking on your microphone through your web browser is an experimental feature.\n      </p>\n      <p>\n        Read more about Audio Chat <a href=\"https://github.com/mozilla/togetherjs/wiki/About-Audio-Chat-and-WebRTC\" target=\"_blank\">here</a>.\n      </p>\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <label for=\"togetherjs-rtc-info-dismiss\" style=\"display: inline;\">\n        <input class=\"togetherjs-dont-show-again\" id=\"togetherjs-rtc-info-dismiss\" type=\"checkbox\">\n        Don't show again.\n      </label>\n      <button class=\"togetherjs-default togetherjs-dismiss\" type=\"button\">Close</button>\n    </section>\n  </div>\n\n  <!-- this is popped up when you hit the audio button, but RTC isn't\n  supported: -->\n  <div id=\"togetherjs-rtc-not-supported\" class=\"togetherjs-window\"\n       data-bind-to=\"#togetherjs-audio-button\"\n       style=\"display: none\">\n    <header> Audio Chat </header>\n\n    <section>\n      <p>Audio chat requires you to use a <a href=\"https://github.com/mozilla/togetherjs/wiki/About-Audio-Chat-and-WebRTC\" target=\"_blank\">\n        newer browser\n      </a>!</p>\n      <p>\n        Live audio chat requires a newer (or different) browser than you're using.\n      </p>\n      <p>\n        See\n        <a href=\"https://github.com/mozilla/togetherjs/wiki/About-Audio-Chat-and-WebRTC\" target=\"_blank\">\n          this page\n        </a>\n        for more information and a list of supported browsers.\n      </p>\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <div class=\"togetherjs-rtc-dialog-btn\">\n        <button class=\"togetherjs-default togetherjs-dismiss\" type=\"button\">Close</button>\n      </div>\n    </section>\n  </div>\n\n  <!-- The popup when a chat message comes in and the #togetherjs-chat window isn't open -->\n  <div id=\"togetherjs-chat-notifier\" class=\"togetherjs-notification\"\n       data-bind-to=\"#togetherjs-chat-button\"\n       style=\"display: none\">\n    <img src=\"http://localhost:8080/togetherjs/images/notification-togetherjs-logo.png\" class=\"togetherjs-notification-logo\" alt=\"\">\n    <img src=\"http://localhost:8080/togetherjs/images/notification-btn-close.png\" class=\"togetherjs-notification-closebtn togetherjs-dismiss\" alt=\"[close]\">\n    <section id=\"togetherjs-chat-notifier-message\">\n    </section>\n  </div>\n\n  <!-- The menu when you click on the profile: -->\n  <div id=\"togetherjs-menu\" class=\"togetherjs-menu\" style=\"display: none\">\n    <div class=\"togetherjs-menu-item togetherjs-menu-disabled\" id=\"togetherjs-menu-profile\">\n      <img id=\"togetherjs-menu-avatar\">\n      <span class=\"togetherjs-person-name-self\" id=\"togetherjs-self-name-display\" data-toggles=\"#togetherjs-menu .togetherjs-self-name\"></span>\n      <input class=\"togetherjs-self-name\" type=\"text\" data-toggles=\"#togetherjs-self-name-display\" style=\"display: none\" placeholder=\"Enter your name\">\n    </div>\n    <div class=\"togetherjs-menu-hr-avatar\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-name\"><img src=\"http://localhost:8080/togetherjs/images/button-pencil.png\" alt=\"\"> Update your name</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-avatar\"><img src=\"http://localhost:8080/togetherjs/images/btn-menu-change-avatar.png\" alt=\"\"> Change avatar</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-color\"><span class=\"togetherjs-person-bgcolor-self\"></span> Pick profile color</div>\n    <div class=\"togetherjs-hr\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-help\">Help</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-feedback\">Feedback</div>\n    <div id=\"togetherjs-invite\" style=\"display: none\">\n      <div class=\"togetherjs-hr\"></div>\n      <div id=\"togetherjs-invite-users\"></div>\n      <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-refresh-invite\">Refresh users</div>\n      <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-invite-anyone\">Invite anyone</div>\n    </div>\n    <div class=\"togetherjs-hr\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-end\"><img src=\"http://localhost:8080/togetherjs/images/button-end-session.png\" alt=\"\"> End <span class=\"togetherjs-tool-name\">TogetherJS</span></div>\n  </div>\n\n  <!-- template for one person in the invite-users list -->\n  <div style=\"display: none\">\n    <div id=\"togetherjs-template-invite-user-item\" class=\"togetherjs-menu-item\">\n      <!-- FIXME: should include avatar in some way -->\n      <span class=\"togetherjs-person-name\"></span>\n    </div>\n  </div>\n\n  <!-- A window version of #togetherjs-menu, for use on mobile -->\n  <div id=\"togetherjs-menu-window\" class=\"togetherjs-window\" style=\"display: none\">\n    <header>Settings and Profile</header>\n    <section>\n    <div class=\"togetherjs-menu-item\">\n      <img class=\"togetherjs-menu-avatar\">\n      <span class=\"togetherjs-person-name-self\" id=\"togetherjs-self-name-display\"></span>\n    </div>\n    <div class=\"togetherjs-menu-hr-avatar\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-name-button\"><img src=\"http://localhost:8080/togetherjs/images/button-pencil.png\" alt=\"\"> Update your name</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-avatar-button\"><img src=\"http://localhost:8080/togetherjs/images/btn-menu-change-avatar.png\" alt=\"\"> Change avatar</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-color-button\"><span class=\"togetherjs-person-bgcolor-self\"></span> Pick profile color</div>\n    <div class=\"togetherjs-hr\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-help-button\">Help</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-feedback-button\">Feedback</div>\n    <div class=\"togetherjs-hr\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-end-button\"><img src=\"http://localhost:8080/togetherjs/images/button-end-session.png\" alt=\"\"> End <span class=\"togetherjs-tool-name\">TogetherJS</span></div>\n    </section>\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-dismiss togetherjs-primary\">OK</button>\n    </section>\n  </div>\n\n  <!-- The name editor, for use on mobile -->\n  <div id=\"togetherjs-edit-name-window\" class=\"togetherjs-window\" style=\"display: none\">\n    <header>Update Name</header>\n    <section>\n      <div>\n        <input class=\"togetherjs-self-name\" type=\"text\" placeholder=\"Enter your name\">\n      </div>\n    </section>\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-dismiss togetherjs-primary\">OK</button>\n    </section>\n  </div>\n\n  <div class=\"togetherjs-menu\" id=\"togetherjs-pick-color\" style=\"display: none\">\n    <div class=\"togetherjs-triangle-up\"><img src=\"http://localhost:8080/togetherjs/images/icn-triangle-up.png\"></div>\n    <div style=\"display: none\">\n      <div id=\"togetherjs-template-swatch\" class=\"togetherjs-swatch\">\n      </div>\n    </div>\n  </div>\n\n  <!-- Invisible elements that handle the RTC audio: -->\n  <audio id=\"togetherjs-audio-element\"></audio>\n  <audio id=\"togetherjs-local-audio\" muted=\"true\" volume=\"0.3\"></audio>\n  <audio id=\"togetherjs-notification\" src=\"http://localhost:8080/togetherjs/images/notification.ogg\"></audio>\n\n  <!-- The intro screen for someone who joins a session the first time: -->\n  <div id=\"togetherjs-intro\" class=\"togetherjs-modal\" style=\"display: none\">\n    <header>Join <span class=\"togetherjs-tool-name\">TogetherJS</span> session?</header>\n    <section>\n      <p>Your friend has asked you to join their <a href=\"https://togetherjs.mozillalabs.com/\" target=\"_blank\"><span class=\"togetherjs-tool-name\">TogetherJS</span></a> browser session to collaborate in real-time!</p>\n\n      <p>Would you like to join their session?</p>\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-destructive togetherjs-modal-dont-join\">No, don't join</button>\n      <button class=\"togetherjs-primary togetherjs-dismiss\">Yes, join session</button>\n    </section>\n  </div>\n\n  <!-- Shown when a web browser is completely incapable of running TogetherJS: -->\n  <div id=\"togetherjs-browser-broken\" class=\"togetherjs-modal\" style=\"display: none\">\n    <header> Sorry </header>\n\n    <section>\n      <p>\n        We're sorry, <span class=\"togetherjs-tool-name\">TogetherJS</span> doesn't work with this browser.  Please\n        <a href=\"https://github.com/mozilla/togetherjs/wiki/Supported-Browsers#supported-browsers\">upgrade\n          to a supported browser</a> to try <span class=\"togetherjs-tool-name\">TogetherJS</span>.\n      </p>\n\n      <p id=\"togetherjs-browser-broken-is-ie\" style=\"display: none\">\n        Internet\n        Explorer <a href=\"https://github.com/mozilla/togetherjs/wiki/Supported-Browsers#internet-explorer\">is\n          not supported</a> and won't be supported in the near term,\n        please use Firefox or Chrome.\n      </p>\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-dismiss togetherjs-primary\">End <span class=\"togetherjs-tool-name\">TogetherJS</span></button>\n    </section>\n\n  </div>\n\n  <!-- Shown when the browser has WebSockets, but is IE (i.e., IE10) -->\n  <div id=\"togetherjs-browser-unsupported\" class=\"togetherjs-modal\" style=\"display: none\">\n    <header> Unsupported Browser </header>\n\n    <section>\n      <p>\n        We're sorry, Internet Explorer <a href=\"https://github.com/mozilla/togetherjs/wiki/Supported-Browsers#internet-explorer\">is not supported</a>\n        at this time.  While we may add support later, adding support is\n        not currently on our roadmap.  Please use Firefox or Chrome.\n      </p>\n\n      <p>You can continue to try to use <span class=\"togetherjs-tool-name\">TogetherJS</span>, but you are likely to hit\n        lots of bugs.  So be warned.</p>\n\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-dismiss togetherjs-primary\">End <span class=\"togetherjs-tool-name\">TogetherJS</span></button>\n      <button class=\"togetherjs-dismiss togetherjs-secondary togetherjs-browser-unsupported-anyway\">Try <span class=\"togetherjs-tool-name\">TogetherJS</span> Anyway</button>\n    </section>\n\n  </div>\n\n  <div id=\"togetherjs-confirm-end\" class=\"togetherjs-modal\" style=\"display: none\">\n    <header> End session? </header>\n    <section>\n      <p>\n        Are you sure you'd like to end your <span class=\"togetherjs-tool-name\">TogetherJS</span> session?\n      </p>\n    </section>\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-cancel togetherjs-dismiss\">Cancel</button>\n      <span class=\"togetherjs-alt-text\">or</span>\n      <button id=\"togetherjs-end-session\" class=\"togetherjs-destructive\">End session</button>\n    </section>\n  </div>\n\n  <div id=\"togetherjs-feedback-form\" class=\"togetherjs-modal\" style=\"display: none;\">\n    <header> Feedback </header>\n    <iframe src=\"https://docs.google.com/a/mozilla.com/forms/d/1lVE7JyRo_tjakN0mLG1Cd9X9vseBX9wci153z9JcNEs/viewform?embedded=true\" width=\"400\" height=\"300\" frameborder=\"0\" marginheight=\"0\" marginwidth=\"0\">Loading form...</iframe>\n    <!-- <p><button class=\"togetherjs-modal-close\">Close</button></p> -->\n  </div>\n\n  <div style=\"display: none\">\n    <!-- This is when you join a session and the other person has already changed to another URL: -->\n    <div id=\"togetherjs-template-url-change\" class=\"togetherjs-modal\">\n      <header> Following to new URL... </header>\n      <section>\n        <div class=\"togetherjs-person\"></div>\n        Following\n        <span class=\"togetherjs-person-name\"></span>\n        to <a href=\"\" class=\"togetherjs-person-url togetherjs-person-url-title\"></a>\n      </section>\n    </div>\n\n    <!-- This is when someone invites you to their session: -->\n    <div id=\"togetherjs-template-invite\" class=\"togetherjs-chat-item\">\n      <div class=\"togetherjs-person\"></div>\n      <div>\n        <span class=\"togetherjs-person-name\"></span>\n        has invited <strong class=\"togetherjs-if-forEveryone\">anyone</strong>\n        <strong class=\"togetherjs-ifnot-forEveryone\">you</strong>\n        to <a href=\"\" data-togetherjs-subattr-href=\"href\" class=\"togetherjs-sub-hrefTitle\" target=\"_blank\"></a>\n      </div>\n    </div>\n\n  </div>\n\n  <!-- The pointer at the side of a window: -->\n  <div id=\"togetherjs-window-pointer-right\" style=\"display: none\"></div>\n  <div id=\"togetherjs-window-pointer-left\" style=\"display: none\"></div>\n\n  <!-- The element that overlaps the background of the page during a modal dialog: -->\n  <div id=\"togetherjs-modal-background\" style=\"display: none\"></div>\n\n  <!-- Some miscellaneous templates -->\n  <div style=\"display: none\">\n\n    <!-- This is the cursor: -->\n    <div id=\"togetherjs-template-cursor\" class=\"togetherjs-cursor togetherjs\">\n      <!-- Note: images/cursor.svg is a copy of this (for editing): -->\n      <!-- crossbrowser svg dropshadow http://demosthenes.info/blog/600/Creating-a-True-CrossBrowser-Drop-Shadow- -->\n      <svg version=\"1.1\" id=\"Layer_1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" x=\"0px\" y=\"0px\"\n      \t width=\"15px\" height=\"22.838px\" viewBox=\"96.344 146.692 15 22.838\" enable-background=\"new 96.344 146.692 15 22.838\"\n      \t xml:space=\"preserve\">\n      <path fill=\"#231F20\" d=\"M98.984,146.692c2.167,1.322,1.624,6.067,3.773,7.298c-0.072-0.488,2.512-0.931,3.097,0\n      \tc0.503,0.337,1.104-0.846,2.653,0.443c0.555,0.593,3.258,2.179,1.001,8.851c-0.446,1.316,2.854,0.135,1.169,2.619\n      \tc-3.748,5.521-9.455,2.787-9.062,1.746c1.06-2.809-6.889-4.885-4.97-9.896c0.834-2.559,2.898,0.653,2.923,0.29\n      \tc-0.434-1.07-2.608-5.541-2.923-6.985C96.587,150.793,95.342,147.033,98.984,146.692z\"/>\n      </svg>\n      <!-- <img class=\"togetherjs-cursor-img\" src=\"http://localhost:8080/togetherjs/images/cursor.svg\"> -->\n      <span class=\"togetherjs-cursor-container\">\n        <span class=\"togetherjs-cursor-name\"></span>\n        <span style=\"display:none\" class=\"togetherjs-cursor-typing\" id=\"togetherjs-cursor-typebox\">\n          <span class=\"togetherjs-typing-ellipse-one\">&#9679;</span><span class=\"togetherjs-typing-ellipse-two\">&#9679;</span><span class=\"togetherjs-typing-ellipse-three\">&#9679;</span>\n        </span>\n        <!-- Displayed when the cursor is below the screen: -->\n        <span class=\"togetherjs-cursor-down\">\n\n        </span>\n        <!-- Displayed when the cursor is above the screen: -->\n        <span class=\"togetherjs-cursor-up\">\n\n        </span>\n      </span>\n    </div>\n\n    <!-- This is the element that goes around focused form elements: -->\n    <div id=\"togetherjs-template-focus\">\n      <div class=\"togetherjs-focus togetherjs-person-bordercolor\"></div>\n    </div>\n\n    <!-- This is a click: -->\n    <div id=\"togetherjs-template-click\" class=\"togetherjs-click togetherjs\">\n    </div>\n  </div>\n</div>\n"),
+    "interface": clean("<% /*\n   This is basically all the markup and interface for TogetherJS.\n   Note all links should be like http://localhost:8080/togetherjs/*\n   these links are rewritten with the location where TogetherJS was deployed.\n\n   This file is inlined into togetherjs/templates.js\n*/ %>\n<div id=\"togetherjs-container\" class=\"togetherjs\">\n\n  <!-- This is the main set of buttons: -->\n  <div id=\"togetherjs-dock\" class=\"togetherjs-dock-right\">\n    <div id=\"togetherjs-dock-anchor\" title=\"Move the dock\">\n      <span id=\"togetherjs-dock-anchor-horizontal\">\n        <img src=\"http://localhost:8080/togetherjs/images/icn-handle-circle@2x.png\" alt=\"drag\">\n      </span>\n      <span id=\"togetherjs-dock-anchor-vertical\">\n        <img src=\"http://localhost:8080/togetherjs/images/icn-handle-circle@2x.png\" alt=\"drag\">\n      </span>\n    </div>\n    <div id=\"togetherjs-buttons\">\n      <div style=\"display: none\">\n        <button id=\"togetherjs-template-dock-person\" class=\"togetherjs-button togetherjs-dock-person\">\n          <div class=\"togetherjs-tooltip togetherjs-dock-person-tooltip\">\n            <span class=\"togetherjs-person-name\"></span>\n            <span class=\"togetherjs-person-tooltip-arrow-r\"></span>\n          </div>\n          <div class=\"togetherjs-person togetherjs-person-status-overlay\"></div>\n        </button>\n      </div>\n      <button id=\"togetherjs-profile-button\" class=\"togetherjs-button\" title=\"This is you\">\n        <div class=\"togetherjs-person togetherjs-person-self\"></div>\n        <div id=\"togetherjs-profile-arrow\"></div>\n      </button>\n      <button id=\"togetherjs-share-button\" class=\"togetherjs-button\" title=\"Add a friend\"></button>\n      <button id=\"togetherjs-audio-button\" class=\"togetherjs-button\" title=\"Turn on microphone\">\n        <span id=\"togetherjs-audio-unavailable\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\">\n        </span>\n        <span id=\"togetherjs-audio-ready\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n        <span id=\"togetherjs-audio-outgoing\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n        <span id=\"togetherjs-audio-incoming\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n        <span id=\"togetherjs-audio-active\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n        <span id=\"togetherjs-audio-muted\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n        <span id=\"togetherjs-audio-error\" class=\"togetherjs-audio-set\" data-toggles=\".togetherjs-audio-set\" style=\"display: none\">\n        </span>\n      </button>\n      <button id=\"togetherjs-chat-button\" class=\"togetherjs-button\" title=\"Chat\"></button>\n      <div id=\"togetherjs-dock-participants\"></div>\n    </div>\n  </div>\n\n  <!-- The window for editing the avatar: -->\n  <div id=\"togetherjs-avatar-edit\" class=\"togetherjs-modal\"\n       style=\"display: none\">\n    <header> Update avatar </header>\n    <section>\n      <div class=\"togetherjs-avatar-preview togetherjs-person togetherjs-person-self\"></div>\n      <div id=\"togetherjs-avatar-buttons\">\n        <input type=\"file\" class=\"togetherjs-upload-avatar\">\n        <!--<button id=\"togetherjs-upload-avatar\" class=\"togetherjs-primary\">Upload a picture</button>-->\n        <!--<button id=\"togetherjs-camera-avatar\" class=\"togetherjs-default\">Take a picture</button>-->\n      </div>\n    </section>\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-cancel togetherjs-dismiss\">Cancel</button>\n      <span class=\"togetherjs-alt-text\">or</span>\n      <button class=\"togetherjs-avatar-save togetherjs-primary\">Save</button>\n    </section>\n  </div>\n\n  <!-- The window for sharing the link: -->\n  <div id=\"togetherjs-share\" class=\"togetherjs-window\"\n       data-bind-to=\"#togetherjs-share-button\" style=\"display: none\">\n    <header> Invite a friend </header>\n    <section>\n      <div class=\"togetherjs-not-mobile\">\n        <p>Copy and paste this link over IM or email:</p>\n        <input type=\"text\" class=\"togetherjs-share-link\">\n      </div>\n      <div class=\"togetherjs-only-mobile\">\n        <p>Copy and paste this link over IM or email:</p>\n        <input type=\"text\" class=\"togetherjs-share-link\">\n        <!-- <a class=\"togetherjs-share-link\" href=\"#\">Press your thumb here.</a> -->\n      </div>\n    </section>\n  </div>\n\n  <!-- Participant Full List view template: -->\n  <div id=\"togetherjs-participantlist\" class=\"togetherjs-window\"\n       data-bind-to=\"#togetherjs-participantlist-button\" style=\"display: none\">\n    <header> Participants </header>\n    <section>\n      <div class=\"togetherjs-not-mobile\">\n        <ul>\n          <li id=\"togetherjs-participant-item\">\n            <img class=\"togetherjs-person togetherjs-person-small\" src=\"http://localhost:8080/togetherjs/images/btn-menu-change-avatar.png\">\n            <span class=\"tj-name togetherjs-person-name\">Useronewith alongname</span>\n            <span class=\"tj-status\">&#9679;</span>\n            <p class=\"tj-urllocation\">Currently at: <a class=\"togetherjs-person-url togetherjs-person-url-title\" href=\"\">http://www.location.comwww.location.comwww.location.comasdfsafd</a></p>\n            <p class=\"tj-follow\">Follow:\n              <label class=\"togetherjs-follow-question\" for=\"togetherjs-person-status-follow\">\n                <input type=\"checkbox\" id=\"togetherjs-person-status-follow\">\n              </label>\n            </p>\n            <section class=\"togetherjs-buttons\">\n              <!-- Displayed when the peer is at a different URL: -->\n              <div class=\"togetherjs-different-url\">\n                <a class=\"togetherjs-nudge togetherjs-default tj-btn-sm\">Nudge them</a>\n                <a href=\"#\" class=\"togetherjs-follow togetherjs-person-url togetherjs-primary tj-btn-sm\">Join them</a>\n              </div>\n              <!-- Displayed when the peer is at your same URL: -->\n              <div class=\"togetherjs-same-url\" style=\"display: none\">\n                <span class=\"togetherjs-person-name\"></span> is on the same page as you.\n              </div>\n            </section>\n          </li>\n        </ul>\n    </section>\n  </div>\n\n  <!-- Participant detail template: -->\n  <div id=\"togetherjs-template-participant-window\" class=\"togetherjs-window\" style=\"display: none\">\n    <header><div class=\"togetherjs-person togetherjs-person-small\"></div><span class=\"togetherjs-person-name\"></span></header>\n\n    <section class=\"togetherjs-participant-window-main\">\n      <p class=\"togetherjs-participant-window-row\"><strong>Role:</strong>\n        <span class=\"togetherjs-person-role\"></span>\n      </p>\n\n      <p class=\"togetherjs-participant-window-row\"><strong>Currently at:</strong>\n        <a class=\"togetherjs-person-url togetherjs-person-url-title\"></a>\n      </p>\n\n      <p class=\"togetherjs-participant-window-row\"><strong>Status:</strong>\n        <span class=\"togetherjs-person-status\"></span>\n      </p>\n\n      <p class=\"togetherjs-participant-window-row\"><strong class=\"togetherjs-float-left\">Follow this participant:</strong>\n        <label class=\"togetherjs-follow-question togetherjs-float-left\" for=\"togetherjs-person-status-follow\">\n          <input type=\"checkbox\" id=\"togetherjs-person-status-follow\">\n        </label>\n        <span class=\"togetherjs-clear\"></span>\n      </p>\n\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <!-- Displayed when the peer is at a different URL: -->\n      <div class=\"togetherjs-different-url\">\n        <a class=\"togetherjs-nudge togetherjs-default\">Nudge them</a>\n        <a href=\"#\" class=\"togetherjs-follow togetherjs-person-url togetherjs-primary\">Join them</a>\n      </div>\n      <!-- Displayed when the peer is at your same URL: -->\n      <div class=\"togetherjs-same-url\" style=\"display: none\">\n        <span class=\"togetherjs-person-name\"></span> is on the same page as you.\n      </div>\n    </section>\n  </div>\n\n  <!-- The chat screen: -->\n  <div id=\"togetherjs-chat\" class=\"togetherjs-window\" data-bind-to=\"#togetherjs-chat-button\"\n       style=\"display: none\">\n    <header> Chat </header>\n    <section class=\"togetherjs-subtitle\">\n      <div id=\"togetherjs-chat-participants\" data-toggles=\"#togetherjs-chat-no-participants\" style=\"display: none\">\n        <span id=\"togetherjs-chat-participant-list\"></span>\n        &amp; You\n      </div>\n      <div id=\"togetherjs-chat-no-participants\" data-toggles=\"#togetherjs-chat-participants\">\n        No one else is here.\n      </div>\n    </section>\n\n    <div style=\"display: none\">\n\n      <!-- Template for one message: -->\n      <div id=\"togetherjs-template-chat-message\" class=\"togetherjs-chat-item togetherjs-chat-message\">\n        <div class=\"togetherjs-person\"></div>\n        <div class=\"togetherjs-timestamp\"><span class=\"togetherjs-time\">HH:MM</span> <span class=\"togetherjs-ampm\">AM/PM</span></div>\n        <div class=\"togetherjs-person-name-abbrev\"></div>\n        <div class=\"togetherjs-chat-content togetherjs-sub-content\"></div>\n      </div>\n\n      <!-- Template for when a person leaves: -->\n      <div id=\"togetherjs-template-chat-left\" class=\"togetherjs-chat-item togetherjs-chat-left-item\">\n        <div class=\"togetherjs-person\"></div>\n        <div class=\"togetherjs-ifnot-declinedJoin\">\n          <div class=\"togetherjs-inline-text\"><span class=\"togetherjs-person-name\"></span> left the session.</div>\n        </div>\n        <div class=\"togetherjs-if-declinedJoin\">\n          <div class=\"togetherjs-inline-text\"><span class=\"togetherjs-person-name\"></span> declined to join the session.</div>\n        </div>\n        <div class=\"togetherjs-clear\"></div>\n      </div>\n\n      <!-- Template when a person joins the session: -->\n      <div id=\"togetherjs-template-chat-joined\" class=\"togetherjs-chat-item togetherjs-chat-join-item\">\n        <div class=\"togetherjs-person\"></div>\n        <div class=\"togetherjs-inline-text\"><span class=\"togetherjs-person-name\"></span> joined the session.</div>\n        <div class=\"togetherjs-clear\"></div>\n      </div>\n\n      <!-- Template for system-derived messages: -->\n      <div id=\"togetherjs-template-chat-system\" class=\"togetherjs-chat-item\">\n        <span class=\"togetherjs-chat-content togetherjs-sub-content\"></span>\n      </div>\n\n      <!-- Template when a person joins the session: -->\n      <!-- <div id=\"togetherjs-template-chat-joined\" class=\"togetherjs-chat-item togetherjs-chat-join-item\">\n        <div class=\"togetherjs-person\"></div>\n        <div class=\"togetherjs-inline-text\"><span class=\"togetherjs-person-name\"></span> joined the session.</div>\n        <div class=\"togetherjs-clear\"></div>\n      </div> -->\n\n      <!-- Template for when someone goes to a new URL: -->\n      <div id=\"togetherjs-template-url-change\" class=\"togetherjs-chat-item togetherjs-chat-url-change\">\n        <div class=\"togetherjs-person\"></div>\n        <div class=\"togetherjs-inline-text\">\n          <div class=\"togetherjs-if-sameUrl\">\n            <span class=\"togetherjs-person-name\"></span>\n            is on the same page as you.\n          </div>\n          <div class=\"togetherjs-ifnot-sameUrl\">\n            <span class=\"togetherjs-person-name\"></span>\n            has gone to: <a href=\"#\" class=\"togetherjs-person-url togetherjs-person-url-title\" target=\"_self\"></a>\n            <section class=\"togetherjs-buttons togetherjs-buttons-notification-diff-url\">\n              <!-- Displayed when the peer is at a different URL: -->\n              <div class=\"togetherjs-different-url togetherjs-notification-diff-url\">\n                <a class=\"togetherjs-nudge togetherjs-default\">Nudge them</a>\n                <a href=\"#\" class=\"togetherjs-follow togetherjs-person-url togetherjs-primary\">Join them</a>\n              </div>\n            </section>\n\n            <!-- <div>\n              <a class=\"togetherjs-nudge togetherjs-secondary\">Nudge them</a>\n              <a href=\"\" class=\"togetherjs-person-url togetherjs-follow togetherjs-primary\">Join them</a>\n            </div> -->\n\n          </div>\n        </div>\n        <div class=\"togetherjs-clear\"></div>\n      </div>\n    </div>\n\n    <section id=\"togetherjs-chat-messages\">\n      <!-- FIX ME// need to have some dialogue that says something like - There are no chats yet! -->\n    </section>\n    <section id=\"togetherjs-chat-input-box\">\n      <textarea id=\"togetherjs-chat-input\" placeholder=\"Type your message here\"></textarea>\n    </section>\n  </div>\n\n  <!-- this is a kind of warning popped up when you (successfully) start RTC: -->\n  <div id=\"togetherjs-rtc-info\" class=\"togetherjs-window\"\n       data-bind-to=\"#togetherjs-audio-button\"\n       style=\"display: none\">\n\n    <header> Audio Chat </header>\n    <section>\n      <p>\n        Activate your <strong>browser microphone</strong> near your URL bar above.\n      </p>\n      <p>\n        Talking on your microphone through your web browser is an experimental feature.\n      </p>\n      <p>\n        Read more about Audio Chat <a href=\"https://github.com/mozilla/togetherjs/wiki/About-Audio-Chat-and-WebRTC\" target=\"_blank\">here</a>.\n      </p>\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <label for=\"togetherjs-rtc-info-dismiss\" style=\"display: inline;\">\n        <input class=\"togetherjs-dont-show-again\" id=\"togetherjs-rtc-info-dismiss\" type=\"checkbox\">\n        Don't show again.\n      </label>\n      <button class=\"togetherjs-default togetherjs-dismiss\" type=\"button\">Close</button>\n    </section>\n  </div>\n\n  <!-- this is popped up when you hit the audio button, but RTC isn't\n  supported: -->\n  <div id=\"togetherjs-rtc-not-supported\" class=\"togetherjs-window\"\n       data-bind-to=\"#togetherjs-audio-button\"\n       style=\"display: none\">\n    <header> Audio Chat </header>\n\n    <section>\n      <p>Audio chat requires you to use a <a href=\"https://github.com/mozilla/togetherjs/wiki/About-Audio-Chat-and-WebRTC\" target=\"_blank\">\n        newer browser\n      </a>!</p>\n      <p>\n        Live audio chat requires a newer (or different) browser than you're using.\n      </p>\n      <p>\n        See\n        <a href=\"https://github.com/mozilla/togetherjs/wiki/About-Audio-Chat-and-WebRTC\" target=\"_blank\">\n          this page\n        </a>\n        for more information and a list of supported browsers.\n      </p>\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <div class=\"togetherjs-rtc-dialog-btn\">\n        <button class=\"togetherjs-default togetherjs-dismiss\" type=\"button\">Close</button>\n      </div>\n    </section>\n  </div>\n\n  <!-- The popup when a chat message comes in and the #togetherjs-chat window isn't open -->\n  <div id=\"togetherjs-chat-notifier\" class=\"togetherjs-notification\"\n       data-bind-to=\"#togetherjs-chat-button\"\n       style=\"display: none\">\n    <img src=\"http://localhost:8080/togetherjs/images/notification-togetherjs-logo.png\" class=\"togetherjs-notification-logo\" alt=\"\">\n    <img src=\"http://localhost:8080/togetherjs/images/notification-btn-close.png\" class=\"togetherjs-notification-closebtn togetherjs-dismiss\" alt=\"[close]\">\n    <section id=\"togetherjs-chat-notifier-message\">\n    </section>\n  </div>\n\n  <!-- The menu when you click on the profile: -->\n  <div id=\"togetherjs-menu\" class=\"togetherjs-menu\" style=\"display: none\">\n    <div class=\"togetherjs-menu-item togetherjs-menu-disabled\" id=\"togetherjs-menu-profile\">\n      <img id=\"togetherjs-menu-avatar\">\n      <span class=\"togetherjs-person-name-self\" id=\"togetherjs-self-name-display\" data-toggles=\"#togetherjs-menu .togetherjs-self-name\"></span>\n      <input class=\"togetherjs-self-name\" type=\"text\" data-toggles=\"#togetherjs-self-name-display\" style=\"display: none\" placeholder=\"Enter your name\">\n    </div>\n    <div class=\"togetherjs-menu-hr-avatar\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-name\"><img src=\"http://localhost:8080/togetherjs/images/button-pencil.png\" alt=\"\"> Update your name</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-avatar\"><img src=\"http://localhost:8080/togetherjs/images/btn-menu-change-avatar.png\" alt=\"\"> Change avatar</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-color\"><span class=\"togetherjs-person-bgcolor-self\"></span> Pick profile color</div>\n    <div class=\"togetherjs-hr\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-help\">Help</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-feedback\">Feedback</div>\n    <div id=\"togetherjs-invite\" style=\"display: none\">\n      <div class=\"togetherjs-hr\"></div>\n      <div id=\"togetherjs-invite-users\"></div>\n      <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-refresh-invite\">Refresh users</div>\n      <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-invite-anyone\">Invite anyone</div>\n    </div>\n    <div class=\"togetherjs-hr\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-end\"><img src=\"http://localhost:8080/togetherjs/images/button-end-session.png\" alt=\"\"> End <span class=\"togetherjs-tool-name\">TogetherJS</span></div>\n  </div>\n\n  <!-- template for one person in the invite-users list -->\n  <div style=\"display: none\">\n    <div id=\"togetherjs-template-invite-user-item\" class=\"togetherjs-menu-item\">\n      <!-- FIXME: should include avatar in some way -->\n      <span class=\"togetherjs-person-name\"></span>\n    </div>\n  </div>\n\n  <!-- A window version of #togetherjs-menu, for use on mobile -->\n  <div id=\"togetherjs-menu-window\" class=\"togetherjs-window\" style=\"display: none\">\n    <header>Settings and Profile</header>\n    <section>\n    <div class=\"togetherjs-menu-item\">\n      <img class=\"togetherjs-menu-avatar\">\n      <span class=\"togetherjs-person-name-self\" id=\"togetherjs-self-name-display\"></span>\n    </div>\n    <div class=\"togetherjs-menu-hr-avatar\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-name-button\"><img src=\"http://localhost:8080/togetherjs/images/button-pencil.png\" alt=\"\"> Update your name</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-avatar-button\"><img src=\"http://localhost:8080/togetherjs/images/btn-menu-change-avatar.png\" alt=\"\"> Change avatar</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-update-color-button\"><span class=\"togetherjs-person-bgcolor-self\"></span> Pick profile color</div>\n    <div class=\"togetherjs-hr\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-help-button\">Help</div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-feedback-button\">Feedback</div>\n    <div class=\"togetherjs-hr\"></div>\n    <div class=\"togetherjs-menu-item\" id=\"togetherjs-menu-end-button\"><img src=\"http://localhost:8080/togetherjs/images/button-end-session.png\" alt=\"\"> End <span class=\"togetherjs-tool-name\">TogetherJS</span></div>\n    </section>\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-dismiss togetherjs-primary\">OK</button>\n    </section>\n  </div>\n\n  <!-- The name editor, for use on mobile -->\n  <div id=\"togetherjs-edit-name-window\" class=\"togetherjs-window\" style=\"display: none\">\n    <header>Update Name</header>\n    <section>\n      <div>\n        <input class=\"togetherjs-self-name\" type=\"text\" placeholder=\"Enter your name\">\n      </div>\n    </section>\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-dismiss togetherjs-primary\">OK</button>\n    </section>\n  </div>\n\n  <div class=\"togetherjs-menu\" id=\"togetherjs-pick-color\" style=\"display: none\">\n    <div class=\"togetherjs-triangle-up\"><img src=\"http://localhost:8080/togetherjs/images/icn-triangle-up.png\"></div>\n    <div style=\"display: none\">\n      <div id=\"togetherjs-template-swatch\" class=\"togetherjs-swatch\">\n      </div>\n    </div>\n  </div>\n\n  <!-- Invisible elements that handle the RTC audio: -->\n  <audio id=\"togetherjs-audio-element\"></audio>\n  <audio id=\"togetherjs-local-audio\" muted=\"true\" volume=\"0.3\"></audio>\n  <audio id=\"togetherjs-notification\" src=\"http://localhost:8080/togetherjs/images/notification.ogg\"></audio>\n\n  <!-- The intro screen for someone who joins a session the first time: -->\n  <div id=\"togetherjs-intro\" class=\"togetherjs-modal\" style=\"display: none\">\n    <header>Join <span class=\"togetherjs-tool-name\">TogetherJS</span> session?</header>\n    <section>\n      <p>Your friend has asked you to join their <a href=\"https://togetherjs.mozillalabs.com/\" target=\"_blank\"><span class=\"togetherjs-tool-name\">TogetherJS</span></a> browser session to collaborate in real-time!</p>\n\n      <p>Would you like to join their session?</p>\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-destructive togetherjs-modal-dont-join\">No, don't join</button>\n      <button class=\"togetherjs-primary togetherjs-dismiss\">Yes, join session</button>\n    </section>\n  </div>\n\n  <!-- Shown when a web browser is completely incapable of running TogetherJS: -->\n  <div id=\"togetherjs-browser-broken\" class=\"togetherjs-modal\" style=\"display: none\">\n    <header> Sorry </header>\n\n    <section>\n      <p>\n        We're sorry, <span class=\"togetherjs-tool-name\">TogetherJS</span> doesn't work with this browser.  Please\n        <a href=\"https://github.com/mozilla/togetherjs/wiki/Supported-Browsers#supported-browsers\">upgrade\n          to a supported browser</a> to try <span class=\"togetherjs-tool-name\">TogetherJS</span>.\n      </p>\n\n      <p id=\"togetherjs-browser-broken-is-ie\" style=\"display: none\">\n        We need your help fixing TogetherJS on Internet Explorer!  Here are a list of IE <a href=\"https://github.com/mozilla/togetherjs/issues?labels=IE&milestone=&page=1&state=open\" target=\"_blank\">GitHub issues</a> we need fixed that you can work on.\n        Internet Explorer <a href=\"https://github.com/mozilla/togetherjs/wiki/Supported-Browsers#internet-explorer\">is\n          currently not supported</a>.  If you do want to try out TogetherJS, we'd suggest using Firefox or Chrome.\n      </p>\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-dismiss togetherjs-primary\">End <span class=\"togetherjs-tool-name\">TogetherJS</span></button>\n    </section>\n\n  </div>\n\n  <!-- Shown when the browser has WebSockets, but is IE (i.e., IE10) -->\n  <div id=\"togetherjs-browser-unsupported\" class=\"togetherjs-modal\" style=\"display: none\">\n    <header> Unsupported Browser </header>\n\n    <section>\n      <p>\n        We need your help fixing TogetherJS on Internet Explorer!  Here are a list of IE <a href=\"https://github.com/mozilla/togetherjs/issues?labels=IE&milestone=&page=1&state=open\" target=\"_blank\">GitHub issues</a> we need fixed that you can work on.\n        Internet Explorer <a href=\"https://github.com/mozilla/togetherjs/wiki/Supported-Browsers#internet-explorer\">is not supported</a>\n        at this time.  While we may add support later, adding support is\n        not currently on our roadmap.  If you do want to try out TogetherJS, we'd suggest using Firefox or Chrome.\n      </p>\n\n      <p>You can continue to try to use <span class=\"togetherjs-tool-name\">TogetherJS</span>, but you are likely to hit\n        lots of bugs.  So be warned.</p>\n\n    </section>\n\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-dismiss togetherjs-primary\">End <span class=\"togetherjs-tool-name\">TogetherJS</span></button>\n      <button class=\"togetherjs-dismiss togetherjs-secondary togetherjs-browser-unsupported-anyway\">Try <span class=\"togetherjs-tool-name\">TogetherJS</span> Anyway</button>\n    </section>\n\n  </div>\n\n  <div id=\"togetherjs-confirm-end\" class=\"togetherjs-modal\" style=\"display: none\">\n    <header> End session? </header>\n    <section>\n      <p>\n        Are you sure you'd like to end your <span class=\"togetherjs-tool-name\">TogetherJS</span> session?\n      </p>\n    </section>\n    <section class=\"togetherjs-buttons\">\n      <button class=\"togetherjs-cancel togetherjs-dismiss\">Cancel</button>\n      <span class=\"togetherjs-alt-text\">or</span>\n      <button id=\"togetherjs-end-session\" class=\"togetherjs-destructive\">End session</button>\n    </section>\n  </div>\n\n  <div id=\"togetherjs-feedback-form\" class=\"togetherjs-modal\" style=\"display: none;\">\n    <header> Feedback </header>\n    <iframe src=\"https://docs.google.com/a/mozilla.com/forms/d/1lVE7JyRo_tjakN0mLG1Cd9X9vseBX9wci153z9JcNEs/viewform?embedded=true\" width=\"400\" height=\"300\" frameborder=\"0\" marginheight=\"0\" marginwidth=\"0\">Loading form...</iframe>\n    <!-- <p><button class=\"togetherjs-modal-close\">Close</button></p> -->\n  </div>\n\n  <div style=\"display: none\">\n    <!-- This is when you join a session and the other person has already changed to another URL: -->\n    <div id=\"togetherjs-template-url-change\" class=\"togetherjs-modal\">\n      <header> Following to new URL... </header>\n      <section>\n        <div class=\"togetherjs-person\"></div>\n        Following\n        <span class=\"togetherjs-person-name\"></span>\n        to <a href=\"\" class=\"togetherjs-person-url togetherjs-person-url-title\"></a>\n      </section>\n    </div>\n\n    <!-- This is when someone invites you to their session: -->\n    <div id=\"togetherjs-template-invite\" class=\"togetherjs-chat-item\">\n      <div class=\"togetherjs-person\"></div>\n      <div>\n        <span class=\"togetherjs-person-name\"></span>\n        has invited <strong class=\"togetherjs-if-forEveryone\">anyone</strong>\n        <strong class=\"togetherjs-ifnot-forEveryone\">you</strong>\n        to <a href=\"\" data-togetherjs-subattr-href=\"href\" class=\"togetherjs-sub-hrefTitle\" target=\"_blank\"></a>\n      </div>\n    </div>\n\n  </div>\n\n  <!-- The pointer at the side of a window: -->\n  <div id=\"togetherjs-window-pointer-right\" style=\"display: none\"></div>\n  <div id=\"togetherjs-window-pointer-left\" style=\"display: none\"></div>\n\n  <!-- The element that overlaps the background of the page during a modal dialog: -->\n  <div id=\"togetherjs-modal-background\" style=\"display: none\"></div>\n\n  <!-- Some miscellaneous templates -->\n  <div style=\"display: none\">\n\n    <!-- This is the cursor: -->\n    <div id=\"togetherjs-template-cursor\" class=\"togetherjs-cursor togetherjs\">\n      <!-- Note: images/cursor.svg is a copy of this (for editing): -->\n      <!-- crossbrowser svg dropshadow http://demosthenes.info/blog/600/Creating-a-True-CrossBrowser-Drop-Shadow- -->\n      <svg version=\"1.1\" id=\"Layer_1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" x=\"0px\" y=\"0px\"\n      \t width=\"15px\" height=\"22.838px\" viewBox=\"96.344 146.692 15 22.838\" enable-background=\"new 96.344 146.692 15 22.838\"\n      \t xml:space=\"preserve\">\n      <path fill=\"#231F20\" d=\"M98.984,146.692c2.167,1.322,1.624,6.067,3.773,7.298c-0.072-0.488,2.512-0.931,3.097,0\n      \tc0.503,0.337,1.104-0.846,2.653,0.443c0.555,0.593,3.258,2.179,1.001,8.851c-0.446,1.316,2.854,0.135,1.169,2.619\n      \tc-3.748,5.521-9.455,2.787-9.062,1.746c1.06-2.809-6.889-4.885-4.97-9.896c0.834-2.559,2.898,0.653,2.923,0.29\n      \tc-0.434-1.07-2.608-5.541-2.923-6.985C96.587,150.793,95.342,147.033,98.984,146.692z\"/>\n      </svg>\n      <!-- <img class=\"togetherjs-cursor-img\" src=\"http://localhost:8080/togetherjs/images/cursor.svg\"> -->\n      <span class=\"togetherjs-cursor-container\">\n        <span class=\"togetherjs-cursor-name\"></span>\n        <span style=\"display:none\" class=\"togetherjs-cursor-typing\" id=\"togetherjs-cursor-typebox\">\n          <span class=\"togetherjs-typing-ellipse-one\">&#9679;</span><span class=\"togetherjs-typing-ellipse-two\">&#9679;</span><span class=\"togetherjs-typing-ellipse-three\">&#9679;</span>\n        </span>\n        <!-- Displayed when the cursor is below the screen: -->\n        <span class=\"togetherjs-cursor-down\">\n\n        </span>\n        <!-- Displayed when the cursor is above the screen: -->\n        <span class=\"togetherjs-cursor-up\">\n\n        </span>\n      </span>\n    </div>\n\n    <!-- This is the element that goes around focused form elements: -->\n    <div id=\"togetherjs-template-focus\">\n      <div class=\"togetherjs-focus togetherjs-person-bordercolor\"></div>\n    </div>\n\n    <!-- This is a click: -->\n    <div id=\"togetherjs-template-click\" class=\"togetherjs-click togetherjs\">\n    </div>\n  </div>\n</div>\n"),
     help: clean("<% /*\n  This is used to show the help when you type /help.  Used in\n  TogetherJS.localChatMessage().\n\n*/ %>\n/help : this message\n/test : run an automated/randomized test (or stop one that is in progress)\n  /test start N : run N times (instead of default 100)\n  /test show : show what kind of actions the random test would take (or stop showing)\n  /test describe : describe the possible actions (instead of showing them)\n/clear : clear the chat area\n/record : open up a recorder for the session\n/playback URL : play back a session that was recorded (it's up to you to figure out how to host it)\n  /playback local:NAME : play a locally saved log\n/savelogs NAME : save the currently recorded logs under NAME (recorder must be open)\n/baseurl : set a local baseUrl to load TogetherJS from, for debugging a development version of TogetherJS.\n/config : override some TogetherJS configuration parameters\n  /config VAR VALUE : set TogetherJS.config(\"VAR\", VALUE).  VALUE must be a legal Javascript/JSON literal.\n  /config clear : remove all overridden configuration\n"),
     walkthrough: clean("<!--\n    Any elements with .togetherjs-walkthrough-firsttime will only be\n    displayed on during the first-time experience.  Any elements with\n    .togetherjs-walkthrough-not-firsttime will only be displayed when\n    the walkthrough is accessed through the Help menu.\n\n    Note you *cannot* use <section class=\"togetherjs-walkthrough-slide\n    togetherjs-walkthrough-firsttime\">: the number of sections must be the\n    same regardless.\n  -->\n<div id=\"togetherjs-walkthrough\" class=\"togetherjs-modal togetherjs-modal-wide\">\n  <header>You're using <span class=\"togetherjs-tool-name\">TogetherJS</span>!<button class=\"togetherjs-close\"></button></header>\n\n  <div id=\"togetherjs-walkthrough-previous\"></div>\n  <div id=\"togetherjs-walkthrough-next\"></div>\n\n  <section class=\"togetherjs-walkthrough-slide\">\n    <p class=\"togetherjs-walkthrough-main-image\"><img src=\"http://localhost:8080/togetherjs/images/walkthrough-images-intro.png\"></p>\n\t<p><span class=\"togetherjs-tool-name\">TogetherJS</span> is a service for your website that makes it easy to collaborate in real-time on: <strong class=\"togetherjs-site-name\">[site name]</strong></p>\n  </section>\n\n  <section class=\"togetherjs-walkthrough-slide\">\n    <div class=\"togetherjs-walkthrough-firsttime\">\n      <div class=\"togetherjs-walkthrough-main-image\">\n        <div class=\"togetherjs-walkthrough-avatar-section\">\n          <div class=\"togetherjs-avatar-preview togetherjs-person togetherjs-person-self\"></div>\n          <div class=\"togetherjs-avatar-upload-input\"><input type=\"file\" class=\"togetherjs-upload-avatar\"></div>\n        </div>\n        <input class=\"togetherjs-self-name\" type=\"text\" placeholder=\"Enter your name\">\n        <div class=\"togetherjs-swatch togetherjs-person-bgcolor-self\"></div>\n        <div class=\"togetherjs-save-settings\">\n          <button class=\"togetherjs-avatar-save togetherjs-primary\">\n            <span id=\"togetherjs-avatar-when-unsaved\">Save</span>\n            <span id=\"togetherjs-avatar-when-saved\" style=\"display: none\">Saved!</span>\n          </button>\n        </div>\n      </div>\n      <p>Set up your avatar, name and user color above.  If you'd like to update it later, you can click your Profile button.</p>\n    </div>\n    <div class=\"togetherjs-walkthrough-not-firsttime\">\n      <p class=\"togetherjs-walkthrough-main-image\"><img src=\"http://localhost:8080/togetherjs/images/walkthrough-images-profile.png\"></p>\n      <p>Change your avatar, name and user color using the Profile button.</p>\n    </div>\n  </section>\n\n  <section class=\"togetherjs-walkthrough-slide\">\n    <p class=\"togetherjs-walkthrough-main-image togetherjs-ifnot-creator\"><img src=\"http://localhost:8080/togetherjs/images/walkthrough-images-invite.png\">\n    </p>\n    <p class=\"togetherjs-ifnot-creator\">You can invite more friends to the session by sending the invite link in the <span class=\"togetherjs-tool-name\">TogetherJS</span> dock.</p>\n    <p class=\"togetherjs-walkthrough-main-image togetherjs-if-creator\">\n      <span class=\"togetherjs-walkthrough-sendlink\">\n        Copy and paste this link into IM or email to invite friends.\n      </span>\n      <input type=\"text\" class=\"togetherjs-share-link\">\n    </p>\n    <p class=\"togetherjs-if-creator\">Send the above link to a friend so they can join your session!  You can find this invite link on the <span class=\"togetherjs-tool-name\">TogetherJS</span> dock as well.</p>\n  </section>\n\n  <section class=\"togetherjs-walkthrough-slide\">\n    <p class=\"togetherjs-walkthrough-main-image\"><img src=\"http://localhost:8080/togetherjs/images/walkthrough-images-participant.png\"></p>\n    <p>Friends who join your <span class=\"togetherjs-tool-name\">TogetherJS</span> session will appear here.  You can click their avatars to see more.</p>\n  </section>\n\n  <section class=\"togetherjs-walkthrough-slide\">\n    <p class=\"togetherjs-walkthrough-main-image\"><img src=\"http://localhost:8080/togetherjs/images/walkthrough-images-chat.png\"></p>\n    <p>When your friends join you in your <span class=\"togetherjs-tool-name\">TogetherJS</span> session, you can chat with them here!</p>\n  </section>\n\n  <section class=\"togetherjs-walkthrough-slide\">\n    <p class=\"togetherjs-walkthrough-main-image\"><img src=\"http://localhost:8080/togetherjs/images/walkthrough-images-rtc.png\"></p>\n    <p>If your browser supports it, click the microphone icon to begin a audio chat. Learn more about this experimental feature <a href=\"https://github.com/mozilla/togetherjs/wiki/About-Audio-Chat-and-WebRTC\" target=\"_blank\">here</a>.</p>\n  </section>\n\n  <section class=\"togetherjs-walkthrough-slide\">\n    <p class=\"togetherjs-walkthrough-main-image\"><img src=\"http://localhost:8080/togetherjs/images/walkthrough-images-logo.png\"></p>\n    <p>Alright, you're ready to use <span class=\"togetherjs-tool-name\">TogetherJS</span>. Now start collaborating on <strong class=\"togetherjs-site-name\">[site name]</strong>!</p>\n  </section>\n\n  <div style=\"display: none\">\n    <!-- There is one of these created for each slide: -->\n    <span id=\"togetherjs-template-walkthrough-slide-progress\" class=\"togetherjs-walkthrough-slide-progress\">&#9679;</span>\n  </div>\n  <section id=\"togetherjs-walkthrough-progress\">\n  </section>\n\n  <section class=\"togetherjs-buttons\">\n    <button class=\"togetherjs-primary togetherjs-dismiss\">I'm ready!</button>\n  </section>\n\n</div><!-- /.togetherjs-modal -->\n")
   };
@@ -2306,6 +2236,7 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
   var assert = util.assert;
   var CHECK_ACTIVITY_INTERVAL = 10*1000; // Every 10 seconds see if someone has gone idle
   var IDLE_TIME = 3*60*1000; // Idle time is 3 minutes
+  var TAB_IDLE_TIME = 2*60*1000; // When you tab away, after two minutes you'll say you are idle
   var BYE_TIME = 10*60*1000; // After 10 minutes of inactivity the person is considered to be "gone"
 
   var ui;
@@ -2316,13 +2247,13 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
   var DEFAULT_NICKNAMES = [
     "Friendly Fox",
     "Brilliant Beaver",
-	"Observant Owl",
-	"Gregarious Giraffe",
-	"Wild Wolf",
-	"Silent Seal",
-	"Wacky Whale",
-	"Curious Cat",
-	"Intelligent Iguana"
+    "Observant Owl",
+    "Gregarious Giraffe",
+    "Wild Wolf",
+    "Silent Seal",
+    "Wacky Whale",
+    "Curious Cat",
+    "Intelligent Iguana"
   ];
 
   var Peer = util.Class({
@@ -2423,6 +2354,7 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
         identityUpdated = true;
       }
       if (msg.avatar && msg.avatar != this.avatar) {
+        util.assertValidUrl(msg.avatar);
         this.avatar = msg.avatar;
         identityUpdated = true;
       }
@@ -2574,6 +2506,7 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
           }
         }
         if (attrs.avatar && attrs.avatar != this.avatar) {
+          util.assertValidUrl(attrs.avatar);
           this.avatar = attrs.avatar;
           updateMsg.avatar = this.avatar;
           if (! attrs.fromLoad) {
@@ -2607,6 +2540,7 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
         }
         this.view.update();
         if (updatePeers && ! attrs.fromLoad) {
+          session.emit("self-updated");
           session.send(updateMsg);
         }
         if (updateIdle && ! attrs.fromLoad) {
@@ -2657,12 +2591,16 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
       _loadFromApp: function () {
         // FIXME: I wonder if these should be optionally functions?
         // We could test typeof==function to distinguish between a getter and a concrete value
-        var getUserName = TogetherJS.getConfig("getUserName");
-        var getUserColor = TogetherJS.getConfig("getUserColor");
-        var getUserAvatar = TogetherJS.getConfig("getUserAvatar");
+        var getUserName = TogetherJS.config.get("getUserName");
+        var getUserColor = TogetherJS.config.get("getUserColor");
+        var getUserAvatar = TogetherJS.config.get("getUserAvatar");
         var name, color, avatar;
         if (getUserName) {
-          name = getUserName();
+          if (typeof getUserName == "string") {
+            name = getUserName;
+          } else {
+            name = getUserName();
+          }
           if (name && typeof name != "string") {
             // FIXME: test for HTML safe?  Not that we require it, but
             // <>'s are probably a sign something is wrong.
@@ -2671,7 +2609,11 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
           }
         }
         if (getUserColor) {
-          color = getUserColor();
+          if (typeof getUserColor == "string") {
+            color = getUserColor;
+          } else {
+            color = getUserColor();
+          }
           if (color && typeof color != "string") {
             // FIXME: would be nice to test for color-ness here.
             console.warn("Error in getUserColor(): should return a string (got", color, ")");
@@ -2679,7 +2621,11 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
           }
         }
         if (getUserAvatar) {
-          avatar = getUserAvatar();
+          if (typeof getUserAvatar == "string") {
+            avatar = getUserAvatar;
+          } else {
+            avatar = getUserAvatar();
+          }
           if (avatar && typeof avatar != "string") {
             console.warn("Error in getUserAvatar(): should return a string (got", avatar, ")");
             avatar = null;
@@ -2698,8 +2644,9 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
     peers.Self.view = ui.PeerView(peers.Self);
     storage.tab.get("peerCache").then(deserialize);
     peers.Self._loadFromSettings().then(function() {
-        peers.Self._loadFromApp();
-        peers.Self.view.update();
+      peers.Self._loadFromApp();
+      peers.Self.view.update();
+      session.emit("self-updated");
     });
   });
 
@@ -2708,6 +2655,21 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
       peers.Self._loadFromApp();
     }
   });
+
+  TogetherJS.config.track(
+    "getUserName",
+    TogetherJS.config.track(
+      "getUserColor",
+      TogetherJS.config.track(
+        "getUserAvatar",
+        function () {
+          if (peers.Self) {
+            peers.Self._loadFromApp();
+          }
+        }
+      )
+    )
+  );
 
   peers._SelfLoaded = util.Deferred();
 
@@ -2798,11 +2760,23 @@ define('peers',["util", "session", "storage", "require"], function (util, sessio
     checkActivityTask = null;
   });
 
+  var tabIdleTimeout = null;
+
   session.on("visibility-change", function (hidden) {
     if (hidden) {
-      peers.Self.update({idle: "inactive"});
+      if (tabIdleTimeout) {
+        clearTimeout(tabIdleTimeout);
+      }
+      tabIdleTimeout = setTimeout(function () {
+        peers.Self.update({idle: "inactive"});
+      }, TAB_IDLE_TIME);
     } else {
-      peers.Self.update({idle: "active"});
+      if (tabIdleTimeout) {
+        clearTimeout(tabIdleTimeout);
+      }
+      if (peers.Self.idle == "inactive") {
+        peers.Self.update({idle: "active"});
+      }
     }
   });
 
@@ -2911,7 +2885,6 @@ define('windowing',["jquery", "util", "peers", "session"], function ($, util, pe
     boundPos.height = bound.height();
     boundPos.width = bound.width();
     var windowHeight = $window.height();
-    var windowWidth = $window.width();
     boundPos.top -= $window.scrollTop();
     boundPos.left -= $window.scrollLeft();
     // FIXME: I appear to have to add the padding to the width to get a "true"
@@ -3179,7 +3152,7 @@ define('linkify',[], function () {
         } else if (item.nodeType == document.TEXT_NODE) {
           while (true) {
             var text = item.nodeValue;
-            var regex = /\bhttps?:\/\/[a-z0-9\.\-_](:\d+)?[^<>()\[\]]*/i;
+            var regex = /\bhttps?:\/\/[a-z0-9\.\-_](:\d+)?[^ \n\t<>()\[\]]*/i;
             var match = regex.exec(text);
             if (! match) {
               break;
@@ -3199,6 +3172,7 @@ define('linkify',[], function () {
       });
     }
     linkifyNode(el);
+    return el;
   }
 
   return linkify;
@@ -4101,6 +4075,10 @@ define('elementFinder',["util", "jquery"], function (util, $) {
       // a jQuery element
       el = el[0];
     }
+    if (el[0] && el.attr && el[0].nodeType == 1) {
+      // Or a jQuery element not made by us
+      el = el[0];
+    }
     if (el.id) {
       return "#" + el.id;
     }
@@ -4114,14 +4092,15 @@ define('elementFinder',["util", "jquery"], function (util, $) {
       return "document";
     }
     var parent = el.parentNode;
-    if (! parent) {
+    if ((! parent) || parent == el) {
       console.warn("elementLocation(", el, ") has null parent");
-      throw "No locatable parent found";
+      throw new Error("No locatable parent found");
     }
     var parentLocation = elementLocation(parent);
     var children = parent.childNodes;
+    var _len = children.length;
     var index = 0;
-    for (var i=0; i<children.length; i++) {
+    for (var i=0; i<_len; i++) {
       if (children[i] == el) {
         break;
       }
@@ -4383,6 +4362,9 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
   var $window = $(window);
   // This is also in togetherjs.less, as @button-height:
   var BUTTON_HEIGHT = 60 + 1; // 60 is button height, 1 is border
+  // chat TextArea
+  var TEXTAREA_LINE_HEIGHT = 20; // in pixels
+  var TEXTAREA_MAX_LINES = 5;
   // This is also in togetherjs.less, under .togetherjs-animated
   var ANIMATION_DURATION = 1000;
   // Time the new user window sticks around until it fades away:
@@ -4541,6 +4523,17 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
     ui.container.find(".togetherjs-window > header, .togetherjs-modal > header").each(function () {
       $(this).append($('<button class="togetherjs-close"></button>'));
     });
+
+    TogetherJS.config.track("disableWebRTC", function (hide, previous) {
+      if (hide && ! previous) {
+        ui.container.find("#togetherjs-audio-button").hide();
+        adjustDockSize(-1);
+      } else if ((! hide) && previous) {
+        ui.container.find("#togetherjs-audio-button").show();
+        adjustDockSize(1);
+      }
+    });
+
   };
 
   // After prepareUI, this actually makes the interface live.  We have
@@ -4561,7 +4554,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
 
     //create the overlay
     if($.browser.mobile) {
-      // $("body").append( "<div class='overlay' style='position: absolute; top: 0; left: 0; background-color: rgba(0,0,0,0); width: 120%; height: 100%; z-index: 1000; margin: -10px'></div>" );
+      // $("body").append( "\x3cdiv class='overlay' style='position: absolute; top: 0; left: 0; background-color: rgba(0,0,0,0); width: 120%; height: 100%; z-index: 1000; margin: -10px'>\x3c/div>" );
     }
 
     // The share link:
@@ -4577,25 +4570,49 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
 
     // The chat input element:
     var input = container.find("#togetherjs-chat-input");
-    input.bind("keyup", function (event) {
-      if (event.which == 13) { // Enter
+    input.bind("keydown", function (event) {
+      if (event.which == 13 && !event.shiftKey) { // Enter without Shift pressed
         submitChat();
         return false;
       }
       if (event.which == 27) { // Escape
         windowing.hide("#togetherjs-chat");
+        return false;
       }
-      return false;
     });
 
     function submitChat() {
       var val = input.val();
-      if (! val) {
-        return;
+      if ($.trim(val)) {
+        input.val("");
+        // triggering the event manually to avoid the addition of newline character to the textarea:
+        input.trigger("input").trigger("propertychange");
+        chat.submit(val);
       }
-      chat.submit(val);
-      input.val("");
     }
+    // auto-resize textarea:
+    input.on("input propertychange", function () {
+      var $this = $(this);
+      var actualHeight = $this.height();
+      // reset the height of textarea to remove trailing empty space (used for shrinking):
+      $this.height(TEXTAREA_LINE_HEIGHT);
+      this.scrollTop = 0;
+      // scroll to bottom:
+      this.scrollTop = 9999;
+      var newHeight = this.scrollTop + $this.height();
+      var maxHeight = TEXTAREA_MAX_LINES * TEXTAREA_LINE_HEIGHT;
+      if (newHeight > maxHeight) {
+        newHeight = maxHeight;
+        this.style.overflowY = "scroll";
+      } else {
+        this.style.overflowY = "hidden";
+      }
+      this.style.height = newHeight + "px";
+      var diff = newHeight - actualHeight;
+      $("#togetherjs-chat-input-box").height($("#togetherjs-chat-input-box").height() + diff);
+      $("#togetherjs-chat-messages").height($("#togetherjs-chat-messages").height() - diff);
+      return false;
+    });
 
     util.testExpose({submitChat: submitChat});
 
@@ -4660,7 +4677,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
       $('#togetherjs-dock #togetherjs-buttons').animate({
         opacity: 1
       });
-      
+
       //for iphone
       if($(window).width() < 480) {
         $('.togetherjs-dock-right').animate({
@@ -4681,7 +4698,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
 
 
       // add bg overlay
-      // $("body").append( "<div class='overlay' style='position: absolute; top: 0; left: -2px; background-color: rgba(0,0,0,0.5); width: 200%; height: 400%; z-index: 1000; margin: 0px;'></div>" );
+      // $("body").append( "\x3cdiv class='overlay' style='position: absolute; top: 0; left: -2px; background-color: rgba(0,0,0,0.5); width: 200%; height: 400%; z-index: 1000; margin: 0px;'>\x3c/div>" );
 
       //disable vertical scrolling
       // $("body").css({
@@ -4739,7 +4756,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
         windowing.toggle("#togetherjs-menu-window");
       });
 
-      // $("body").append( "<div class='overlay' style='position: absolute; top: 0; left: -2px; background-color: rgba(0,0,0,0.5); width: 200%; height: 400%; z-index: 1000; margin: 0px'></div>" );
+      // $("body").append( "\x3cdiv class='overlay' style='position: absolute; top: 0; left: -2px; background-color: rgba(0,0,0,0.5); width: 200%; height: 400%; z-index: 1000; margin: 0px'>\x3c/div>" );
 
       //disable vertical scrolling
       // $("body").css({
@@ -4802,12 +4819,14 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
       $("#togetherjs-edit-name-window input").focus();
     });
 
-    $("#togetherjs-menu .togetherjs-self-name").bind("keyup", function (event) {
+    $("#togetherjs-menu .togetherjs-self-name").bind("keyup change", function (event) {
+      console.log("alrighty", event);
       if (event.which == 13) {
         ui.displayToggle("#togetherjs-self-name-display");
         return;
       }
       var val = $("#togetherjs-menu .togetherjs-self-name").val();
+      console.log("values!!", val);
       if (val) {
         peers.Self.update({name: val});
       }
@@ -4928,9 +4947,13 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
       }
     });
 
-    if (TogetherJS.getConfig("inviteFromRoom")) {
-      container.find("#togetherjs-invite").show();
-    }
+    TogetherJS.config.track("inviteFromRoom", function (inviter, previous) {
+      if (inviter) {
+        container.find("#togetherjs-invite").show();
+      } else {
+        container.find("#togetherjs-invite").hide();
+      }
+    });
 
     container.find("#togetherjs-menu-refresh-invite").click(refreshInvite);
     container.find("#togetherjs-menu-invite-anyone").click(function () {
@@ -5110,6 +5133,21 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
     hideMenu();
   }
 
+  function adjustDockSize(buttons) {
+    /* Add or remove spots from the dock; positive number to
+       add button(s), negative number to remove button(s)
+       */
+    assert(typeof buttons == "number");
+    assert(buttons && Math.floor(buttons) == buttons);
+    var iface = $("#togetherjs-dock");
+    var newHeight = iface.height() + (BUTTON_HEIGHT * buttons);
+    assert(newHeight >= BUTTON_HEIGHT * 3, "Height went too low (", newHeight,
+           "), should never be less than 3 buttons high (", BUTTON_HEIGHT * 3, ")");
+    iface.css({
+      height: newHeight + "px"
+    });
+  }
+
   // Misc
 
   function updateShareLink() {
@@ -5184,6 +5222,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
         assert(content.length);
         attrs.text = content.text() + "\n" + attrs.text;
         attrs.messageId = lastEl.attr("data-message-id");
+        lastEl.remove();
       }
       var el = templating.sub("chat-message", {
         peer: attrs.peer,
@@ -5266,7 +5305,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
         return false;
       });
       el.find(".togetherjs-follow").click(function () {
-        var url = attrs.peers.url;
+        var url = attrs.peer.url;
         if (attrs.peer.urlHash) {
           url += attrs.peer.urlHash;
         }
@@ -5403,6 +5442,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
       container.find("." + this.peer.className("togetherjs-person-name-abbrev-")).text(abbrev);
       var avatarEl = container.find("." + this.peer.className("togetherjs-person-"));
       if (this.peer.avatar) {
+        util.assertValidUrl(this.peer.avatar);
         avatarEl.css({
           backgroundImage: "url(" + this.peer.avatar + ")"
         });
@@ -5525,33 +5565,40 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
         peer: this.peer
       });
     },
-    
+
     // when there are too many participants in the dock, consolidate the participants to one avatar, and on mouseOver, the dock expands down to reveal the rest of the participants
     // if there are X users in the session
     // then hide the users in the dock
     // and shrink the size of the dock
     // and if you rollover the dock, it expands and reveals the rest of the participants in the dock
-    
+
     //if users hit X then show the participant button with the consol
 
     dock: deferForContainer(function () {
-      
+
+      var numberOfUsers = peers.getAllPeers().length;
+
       // collapse the Dock if too many users
       function CollapsedDock() {
-        //calculate number of users in the session
-        var numberOfUsers = parseInt(peers.getAllPeers().length);
-        if( numberOfUsers >= 5) {    
-          // decrease/reset dock height
-          $("#togetherjs-dock").css("height", 260);
-          //replace participant button
-          $("#togetherjs-dock-participants").replaceWith("<button class='togetherjs-button togetherjs-dock-person'><div class='togetherjs-tooltip togetherjs-dock-person-tooltip'><span class='togetherjs-person-name'>Participant List</span><span class='togetherjs-person-tooltip-arrow-r'></span></div><div class='togetherjs-person togetherjs-person-status-overlay' title='Participant List' style='background-image: url(http://localhost:8888/images/robot-avatar.png); border-color: rgb(255, 0, 0);'></div></button>");
-          // new full participant window created on toggle
-
-
-        }
+        // decrease/reset dock height
+        $("#togetherjs-dock").css("height", 260);
+        //replace participant button
+        $("#togetherjs-dock-participants").replaceWith("<button id='togetherjs-participantlist-button' class='togetherjs-button'><div class='togetherjs-tooltip togetherjs-dock-person-tooltip'><span class='togetherjs-person-name'>Participants</span><span class='togetherjs-person-tooltip-arrow-r'></span></div><div class='togetherjs-person togetherjs-person-status-overlay' title='Participant List' style='background-image: url(http://localhost:8888/togetherjs/images/robot-avatar.png); border-color: rgb(255, 0, 0);'></div></button>");
+        // new full participant window created on toggle
+        $("#togetherjs-participantlist-button").click(function () {
+          windowing.toggle("#togetherjs-participantlist");
+        });
       }
-      CollapsedDock();
-      
+
+      // FIXME: turned off for now
+      if( numberOfUsers >= 5 && false) {
+        CollapsedDock();
+      } else {
+        // reset
+
+      }
+
+
       if (this.dockElement) {
         return;
       }
@@ -5561,10 +5608,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
       this.dockElement.attr("id", this.peer.className("togetherjs-dock-element-"));
       ui.container.find("#togetherjs-dock-participants").append(this.dockElement);
       this.dockElement.find(".togetherjs-person").animateDockEntry();
-      var iface = $("#togetherjs-dock");
-      iface.css({
-        height: iface.height() + BUTTON_HEIGHT + "px"
-      });
+      adjustDockSize(1);
       this.detailElement = templating.sub("participant-window", {
         peer: this.peer
       });
@@ -5617,10 +5661,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
         this.dockElement = null;
         this.detailElement.remove();
         this.detailElement = null;
-        var iface = $("#togetherjs-dock");
-        iface.css({
-         height: (iface.height() - BUTTON_HEIGHT) + "px"
-        });
+        adjustDockSize(-1);
       }).bind(this));
     },
 
@@ -5634,7 +5675,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
         return;
       }
       pos = elementFinder.pixelForPosition(pos);
-      $(document.body).easeTo(pos);
+      $("html, body").easeTo(pos);
     },
 
     updateFollow: function () {
@@ -5691,7 +5732,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
   }
 
   function inviteHubUrl() {
-    var base = TogetherJS.getConfig("inviteFromRoom");
+    var base = TogetherJS.config.get("inviteFromRoom");
     assert(base);
     return util.makeUrlAbsolute(base, session.hubUrl());
   }
@@ -5792,7 +5833,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
   });
 
   session.on("new-element", function (el) {
-    if (TogetherJS.getConfig("toolName")) {
+    if (TogetherJS.config.get("toolName")) {
       ui.updateToolName(el);
     }
   });
@@ -5800,7 +5841,7 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
   var setToolName = false;
   ui.updateToolName = function (container) {
     container = container || $(document.body);
-    var name = TogetherJS.getConfig("toolName");
+    var name = TogetherJS.config.get("toolName");
     if (setToolName && ! name) {
       name = "TogetherJS";
     }
@@ -5809,6 +5850,10 @@ define('ui',["require", "jquery", "util", "session", "templates", "templating", 
       setToolName = true;
     }
   };
+
+  TogetherJS.config.track("toolName", function (name) {
+    ui.updateToolName(ui.container);
+  });
 
   return ui;
 
@@ -6027,6 +6072,12 @@ define('chat',["require", "jquery", "util", "session", "ui", "templates", "playb
       messageId: msg.messageId,
       notify: true
     });
+    saveChatMessage({
+      text: msg.text,
+      date: Date.now(),
+      peerId: msg.peer.id,
+      messageId: msg.messageId
+    });
   });
 
   // FIXME: this doesn't really belong in this module:
@@ -6058,6 +6109,12 @@ define('chat',["require", "jquery", "util", "session", "ui", "templates", "playb
       peer: peers.Self,
       messageId: messageId,
       notify: false
+    });
+    saveChatMessage({
+      text: message,
+      date: Date.now(),
+      peerId: peers.Self.id,
+      messageId: messageId
     });
   };
 
@@ -6163,9 +6220,10 @@ define('chat',["require", "jquery", "util", "session", "ui", "templates", "playb
     command_exec: function () {
       var expr = Array.prototype.slice.call(arguments).join(" ");
       var result;
+      // We use this to force global eval (not in this scope):
       var e = eval;
       try {
-        result = eval(expr);
+        result = e(expr);
       } catch (error) {
         ui.chat.system({
           text: "Error: " + error
@@ -6338,8 +6396,346 @@ define('chat',["require", "jquery", "util", "session", "ui", "templates", "playb
 
   };
 
+  // this section deal with saving/restoring chat history as long as session is alive
+  var chatStorageKey = "chatlog";
+  var maxLogMessages = 100;
+
+  function saveChatMessage(obj) {
+    assert(obj.peerId);
+    assert(obj.messageId);
+    assert(obj.date);
+    assert(typeof obj.text == "string");
+
+    loadChatLog().then(function (log) {
+      for (var i = log.length - 1; i >= 0; i--) {
+        if (log[i].messageId === obj.messageId) {
+          return;
+        }
+      }
+      log.push(obj);
+      if (log.length > maxLogMessages) {
+        log.splice(0, log.length - maxLogMessages);
+      }
+      storage.tab.set(chatStorageKey, log);
+    });
+  }
+
+  function loadChatLog() {
+    return storage.tab.get(chatStorageKey, []);
+  }
+
+  session.once("ui-ready", function () {
+    loadChatLog().then(function (log) {
+      if (! log) {
+        return;
+      }
+      for (var i = 0; i < log.length; i++) {
+        // peers should already be loaded from sessionStorage by the peers module
+        // maybe i should use a try catch block here
+        var currentPeer = peers.getPeer(log[i].peerId);
+        ui.chat.text({
+          text: log[i].text,
+          date: log[i].date,
+          peer: currentPeer,
+          messageId: log[i].messageId
+        });
+      }
+    });
+  });
+  //delete chat log
+  session.on("close", function(){
+    storage.tab.set(chatStorageKey, undefined);
+  });
+
   return chat;
 
+});
+
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+define('console',["util"], function (util) {
+
+  var console = window.console || {log: function () {}};
+
+  var Console = util.Class({
+    constructor: function () {
+      this.messages = [];
+      this.level = this.levels.log;
+    },
+
+    messageLimit: 100,
+
+    levels: {
+      debug: 1,
+      // FIXME: I'm considering *not* wrapping console.log, and strictly keeping
+      // it as a debugging tool; also line numbers would be preserved
+      log: 2,
+      info: 3,
+      notify: 4,
+      warn: 5,
+      error: 6,
+      fatal: 7
+    },
+
+    // Gets set below:
+    maxLevel: 0,
+
+    consoleLevels: [
+      [],
+      console.debug || [],
+      console.log || [],
+      console.info || [],
+      console.notify || [],
+      console.warn || [],
+      console.error || [],
+      console.fatal || []
+    ],
+
+    levelNames: {},
+
+    setLevel: function (l) {
+      var number;
+      if (typeof l == "string") {
+        number = this.levels[l];
+        if (number === undefined) {
+          throw new Error("Tried to set Console level to unknown level string: " + l);
+        }
+        l = number;
+      }
+      if (typeof l == "function") {
+        number = this.consoleLevels.indexOf(l);
+        if (number == -1) {
+          throw new Error("Tried to set Console level based on unknown console function: " + l);
+        }
+        l = number;
+      }
+      if (typeof l == "number") {
+        if (l < 0) {
+          throw new Error("Console level must be 0 or larger: " + l);
+        } else if (l > this.maxLevel) {
+          throw new Error("Console level must be " + this.maxLevel + " or smaller: " + l);
+        }
+      }
+      this.level = l;
+    },
+
+    write: function (level) {
+      try {
+        this.messages.push([
+          Date.now(),
+          level,
+          this._stringify(Array.prototype.slice.call(arguments, 1))
+        ]);
+      } catch (e) {
+        console.warn("Error stringifying argument:", e);
+      }
+      if (level != "suppress" && this.level <= level) {
+        var method = console[this.levelNames[level]];
+        if (! method) {
+          method = console.log;
+        }
+        method.apply(console, Array.prototype.slice.call(arguments, 1));
+      }
+    },
+
+    suppressedWrite: function () {
+      this.write.apply(this, ["suppress"].concat(Array.prototype.slice.call(arguments)));
+    },
+
+    trace: function (level) {
+      level = level || 'log';
+      if (console.trace) {
+        level = "suppressedWrite";
+      }
+      try {
+        throw new Error();
+      } catch (e) {
+        // FIXME: trim this frame
+        var stack = e.stack;
+        stack = stack.replace(/^[^\n]*\n/, "");
+        this[level](stack);
+      }
+      if (console.trace) {
+        console.trace();
+      }
+    },
+
+    _browserInfo: function () {
+      // FIXME: add TogetherJS version and
+      return [
+        "TogetherJS base URL: " + TogetherJS.baseUrl,
+        "User Agent: " + navigator.userAgent,
+        "Page loaded: " + this._formatDate(TogetherJS.pageLoaded),
+        "Age: " + this._formatMinutes(Date.now() - TogetherJS.pageLoaded) + " minutes",
+        // FIXME: make this right:
+        //"Window: height: " + window.screen.height + " width: " + window.screen.width
+        "URL: " + location.href,
+        "------+------+----------------------------------------------"
+      ];
+    },
+
+    _stringify: function (args) {
+      var s = "";
+      for (var i=0; i<args.length; i++) {
+        if (s) {
+          s += " ";
+        }
+        s += this._stringifyItem(args[i]);
+      }
+      return s;
+    },
+
+    _stringifyItem: function (item) {
+      if (typeof item == "string") {
+        if (item === "") {
+          return '""';
+        }
+        return item;
+      }
+      if (typeof item == "object" && item.repr) {
+        try {
+          return item.repr();
+        } catch (e) {
+          console.warn("Error getting object repr:", item, e);
+        }
+      }
+      if (item !== null && typeof item == "object") {
+        // FIXME: this can drop lots of kinds of values, like a function or undefined
+        item = JSON.stringify(item);
+      }
+      return item.toString();
+    },
+
+    _formatDate: function (timestamp) {
+      return (new Date(timestamp)).toISOString();
+    },
+
+    _formatTime: function (timestamp) {
+      return ((timestamp - TogetherJS.pageLoaded) / 1000).toFixed(2);
+    },
+
+    _formatMinutes: function (milliseconds) {
+      var m = Math.floor(milliseconds / 1000 / 60);
+      var remaining = milliseconds - (m * 1000 * 60);
+      if (m > 10) {
+        // Over 10 minutes, just ignore the seconds
+        return m;
+      }
+      var seconds = Math.floor(remaining / 1000) + "";
+      m += ":";
+      seconds = lpad(seconds, 2, "0");
+      m += seconds;
+      if (m == "0:00") {
+        m += ((remaining / 1000).toFixed(3) + "").substr(1);
+      }
+      return m;
+    },
+
+    _formatLevel: function (l) {
+      if (l === "suppress") {
+        return "";
+      }
+      return this.levelNames[l];
+    },
+
+    toString: function () {
+      try {
+        var lines = this._browserInfo();
+        this.messages.forEach(function (m) {
+          lines.push(lpad(this._formatTime(m[0]), 6) + " " + rpad(this._formatLevel(m[1]), 6) + " " + lpadLines(m[2], 14));
+        }, this);
+        return lines.join("\n");
+      } catch (e) {
+        // toString errors can otherwise be swallowed:
+        console.warn("Error running console.toString():", e);
+        throw e;
+      }
+    },
+
+    submit: function (options) {
+      // FIXME: friendpaste is broken for this
+      // (and other pastebin sites aren't really Browser-accessible)
+      return util.Deferred(function (def) {
+        options = options || {};
+        var site = options.site || TogetherJS.config.get("pasteSite") || "https://www.friendpaste.com/";
+        var req = new XMLHttpRequest();
+        req.open("POST", site);
+        req.setRequestHeader("Content-Type", "application/json");
+        req.send(JSON.stringify({
+          "title": options.title || "TogetherJS log file",
+          "snippet": this.toString(),
+          "language": "text"
+        }));
+        req.onreadystatechange = function () {
+          if (req.readyState === 4) {
+            var data = JSON.parse(req.responseText);
+          }
+        };
+      });
+    }
+
+  });
+
+  function rpad(s, len, pad) {
+    s = s + "";
+    pad = pad || " ";
+    while (s.length < len) {
+      s += pad;
+    }
+    return s;
+  }
+
+  function lpad(s, len, pad) {
+    s = s + "";
+    pad = pad || " ";
+    while (s.length < len) {
+      s = pad + s;
+    }
+    return s;
+  }
+
+  function lpadLines(s, len, pad) {
+    var i;
+    s = s + "";
+    if (s.indexOf("\n") == -1) {
+      return s;
+    }
+    pad = pad || " ";
+    var fullPad = "";
+    for (i=0; i<len; i++) {
+      fullPad += pad;
+    }
+    s = s.split(/\n/g);
+    for (i=1; i<s.length; i++) {
+      s[i] = fullPad + s[i];
+    }
+    return s.join("\n");
+  }
+
+
+
+  // This is a factory that creates `Console.prototype.debug`, `.error` etc:
+  function logFunction(name, level) {
+    return function () {
+      this.write.apply(this, [level].concat(Array.prototype.slice.call(arguments)));
+    };
+  }
+
+  util.forEachAttr(Console.prototype.levels, function (value, name) {
+    Console.prototype[name] = logFunction(name, value);
+    Console.prototype.maxLevel = Math.max(Console.prototype.maxLevel, value);
+  });
+
+  util.forEachAttr(Console.prototype.levels, function (value, name) {
+    Console.prototype.levelNames[value] = name;
+  });
+
+  var appConsole = Console();
+
+  appConsole.ConsoleClass = Console;
+
+  return appConsole;
 });
 
 /* This Source Code Form is subject to the terms of the Mozilla Public
@@ -6348,7 +6744,6 @@ define('chat',["require", "jquery", "util", "session", "ui", "templates", "playb
 
 define('eventMaker',["jquery", "util"], function ($, util) {
   var eventMaker = util.Module("eventMaker");
-  var assert = util.assert;
 
   eventMaker.performClick = function (target) {
     // FIXME: should accept other parameters, like Ctrl/Alt/etc
@@ -6394,7 +6789,7 @@ define('eventMaker',["jquery", "util"], function ($, util) {
     target = $(target)[0];
     var event = document.createEvent("HTMLEvents");
     event.initEvent("change", true, true);
-    var cancelled = target.dispatchEvent(event);
+    target.dispatchEvent(event);
   };
 
   return eventMaker;
@@ -6424,7 +6819,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
     } else {
       // FIXME: This should be caught even before the cursor-update message,
       // when the peer goes to another URL
-      Cursor.getClient(msg.clientId).hideOtherUrl(msg);
+      Cursor.getClient(msg.clientId).hideOtherUrl();
     }
   });
 
@@ -6520,7 +6915,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
       this.setPosition(top, left);
     },
 
-    hideOtherUrl: function (msg) {
+    hideOtherUrl: function () {
       if (this.atOtherUrl) {
         return;
       }
@@ -6822,16 +7217,12 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
       if (! TogetherJS.running) {
         // This can end up running right after TogetherJS has been closed, often
         // because TogetherJS was closed with a click...
+        return;
       }
       var element = event.target;
       if (element == document.documentElement) {
         // For some reason clicking on <body> gives the <html> element here
         element = document.body;
-      }
-      if (! TogetherJS.running) {
-        // This can end up running right after TogetherJS has been closed, often
-        // because TogetherJS was closed with a click...
-        return;
       }
       if (elementFinder.ignoreElement(element)) {
         return;
@@ -6842,6 +7233,14 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
         return;
       }
 
+      var dontShowClicks = TogetherJS.config.get("dontShowClicks");
+      var cloneClicks = TogetherJS.config.get("cloneClicks");
+      // If you dont want to clone the click for this element
+      // and you dont want to show the click for this element or you dont want to show any clicks
+      // then return to avoid sending a useless click
+      if ((! util.matchElement(element, cloneClicks)) && util.matchElement(element, dontShowClicks)) {
+        return;
+      }
       var location = elementFinder.elementLocation(element);
       var offset = $(element).offset();
       var offsetX = event.pageX - offset.left;
@@ -6852,12 +7251,15 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
         offsetX: offsetX,
         offsetY: offsetY
       });
+      if (util.matchElement(element, dontShowClicks)) {
+        return;
+      }
       //displayClick({top: event.pageY, left: event.pageX}, peers.Self.color);
     });
   }
-  
+
   session.hub.on("app.codiad", function (data) {
-    codiad.together.handle(data);
+     codiad.together.handle(data);
   });
 
   var CLICK_TRANSITION_TIME = 3000;
@@ -6873,16 +7275,19 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
       return;
     }
     Cursor.getClient(pos.clientId).updatePosition(pos);
-    var element = templating.clone("click");
     var target = $(elementFinder.findElement(pos.element));
     var offset = target.offset();
     var top = offset.top + pos.offsetY;
     var left = offset.left + pos.offsetX;
-    displayClick({top: top, left: left}, pos.peer.color);
-    var cloneClicks = TogetherJS.getConfig("cloneClicks");
-    if (cloneClicks && target.is(cloneClicks)) {
+    var cloneClicks = TogetherJS.config.get("cloneClicks");
+    if (util.matchElement(target, cloneClicks)) {
       eventMaker.performClick(target);
     }
+    var dontShowClicks = TogetherJS.config.get("dontShowClicks");
+    if (util.matchElement(target, dontShowClicks)) {
+      return;
+    }
+    displayClick({top: top, left: left}, pos.peer.color);
   });
 
   function displayClick(pos, color) {
@@ -6893,8 +7298,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
     element.css({
       top: pos.top,
       left: pos.left,
-      borderColor: color,
-      'z-index': '999998'
+      borderColor: color
     });
     setTimeout(function () {
       element.addClass("togetherjs-clicking");
@@ -7729,6 +8133,16 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
 
   var inRemoteUpdate = false;
 
+  function suppressSync(element) {
+    var ignoreForms = TogetherJS.config.get("ignoreForms");
+    if (ignoreForms === true) {
+      return true;
+    }
+    else {
+      return $(element).is(ignoreForms.join(",")); 
+    }
+  }
+
   function maybeChange(event) {
     // Called when we get an event that may or may not indicate a real change
     // (like keyup in a textarea)
@@ -7739,29 +8153,40 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
   }
 
   function change(event) {
+    sendData({
+      element: event.target,
+      value: getValue(event.target)
+    });
+  }
+
+  function sendData(attrs) {
+    var el = $(attrs.element);
+    assert(el);
+    var tracker = attrs.tracker;
+    var value = attrs.value;
     if (inRemoteUpdate) {
       return;
     }
-    if (elementFinder.ignoreElement(event.target) || elementTracked(event.target)) {
+    if (elementFinder.ignoreElement(el) ||
+        (elementTracked(el) && !tracker) ||
+        suppressSync(el)) {
       return;
     }
-    var el = $(event.target);
     var location = elementFinder.elementLocation(el);
-    var value = getValue(el);
     var msg = {
       type: "form-update",
       element: location
     };
-    if (isText(el)) {
+    if (isText(el) || tracker) {
       var history = el.data("togetherjsHistory");
-      if (history.current == value) {
-        return;
-      }
       if (history) {
+        if (history.current == value) {
+          return;
+        }
         var delta = ot.TextReplace.fromChange(history.current, value);
         assert(delta);
         history.add(delta);
-        maybeSendUpdate(msg.element, history);
+        maybeSendUpdate(msg.element, history, tracker);
         return;
       } else {
         msg.value = value;
@@ -7811,14 +8236,14 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
     trackerName: "AceEditor",
 
     constructor: function (el) {
-      this.element = $(el);
-      assert(this.element.hasClass("ace_editor"));
+      this.element = $(el)[0];
+      assert($(this.element).hasClass("ace_editor"));
       this._change = this._change.bind(this);
       this._editor().document.on("change", this._change);
     },
 
     tracked: function (el) {
-      return this.element[0] === el;
+      return this.element === $(el)[0];
     },
 
     destroy: function (el) {
@@ -7826,23 +8251,23 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
     },
 
     update: function (msg) {
-      this._editor().document.getDocument().applyDeltas([msg.delta]);
+      this._editor().document.setValue(msg.value);
     },
 
     init: function (update, msg) {
-      this._editor().document.setValue(update.value);
+      this.update(update);
     },
 
     makeInit: function () {
       return {
-        element: elementFinder.elementLocation(this.element),
+        element: this.element,
         tracker: this.trackerName,
         value: this._editor().document.getValue()
       };
     },
 
     _editor: function () {
-      return this.element[0].env;
+      return this.element.env;
     },
 
     _change: function (e) {
@@ -7851,14 +8276,15 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
       if (inRemoteUpdate) {
         return;
       }
-      // FIXME: I want to use a more normalized version of replace instead of
-      // ACE's native delta
-      session.send({
-        type: "form-update",
+      sendData({
         tracker: this.trackerName,
-        element: elementFinder.elementLocation(this.element),
-        delta: JSON.parse(JSON.stringify(e.data))
+        element: this.element,
+        value: this.getContent()
       });
+    },
+
+    getContent: function() {
+      return this._editor().document.getValue();
     }
   });
 
@@ -7876,14 +8302,14 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
     trackerName: "CodeMirrorEditor",
 
     constructor: function (el) {
-      this.element = $(el);
-      assert(this.element[0].CodeMirror);
+      this.element = $(el)[0];
+      assert(this.element.CodeMirror);
       this._change = this._change.bind(this);
       this._editor().on("change", this._change);
     },
 
     tracked: function (el) {
-      return this.element[0] === el;
+      return this.element === $(el)[0];
     },
 
     destroy: function (el) {
@@ -7891,19 +8317,18 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
     },
 
     update: function (msg) {
-      this._editor().replaceRange(
-        msg.change.text,
-        msg.change.from,
-        msg.change.to);
+      this._editor().setValue(msg.value);
     },
 
-    init: function (update, msg) {
-      this._editor().setValue(update.value);
+    init: function (msg) {
+      if (msg.value) {
+        this.update(msg);
+      }
     },
 
     makeInit: function () {
       return {
-        element: elementFinder.elementLocation(this.element),
+        element: this.element,
         tracker: this.trackerName,
         value: this._editor().getValue()
       };
@@ -7913,27 +8338,19 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
       if (inRemoteUpdate) {
         return;
       }
-      delete change.origin;
-      var next = change.next;
-      delete change.next;
-      if (Array.isArray(change.text)) {
-        // This seems to be version-specific with CodeMirror, but sometimes
-        // the text is an array of lines.
-        change.text = change.text.join("\n");
-      }
-      session.send({
-        type: "form-update",
+      sendData({
         tracker: this.trackerName,
-        element: elementFinder.elementLocation(this.element),
-        change: change
+        element: this.element,
+        value: this.getContent()
       });
-      if (next) {
-        this._change(editor, next);
-      }
     },
 
     _editor: function () {
-      return this.element[0].CodeMirror;
+      return this.element.CodeMirror;
+    },
+
+    getContent: function() {
+      return this._editor().getValue();
     }
   });
 
@@ -7963,13 +8380,99 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
 
   TogetherJS.addTracker(CodeMirrorEditor, true /* skip setInit */);
 
+
+  var CKEditor = util.Class({
+    trackerName: "CKEditor",
+
+    constructor: function (el) {
+      this.element = $(el)[0];
+      assert(CKEDITOR);
+      assert(CKEDITOR.dom.element.get(this.element));
+      this._change = this._change.bind(this);
+      // FIXME: change event is available since CKEditor 4.2
+      this._editor().on("change", this._change);
+    },
+    tracked: function (el) {
+      return this.element === $(el)[0];
+    },
+    destroy: function (el) {
+      this._editor().removeListener("change", this._change);
+    },
+
+    update: function (msg) {
+      //FIXME: use setHtml instead of setData to avoid frame reloading overhead
+      this._editor().editable().setHtml(msg.value);
+    },
+
+    init: function (update, msg) {
+      this.update(update);
+    },
+
+    makeInit: function () {
+      return {
+        element: this.element,
+        tracker: this.trackerName,
+        value: this.getContent()
+      };
+    },
+
+    _change: function (e) {
+      if (inRemoteUpdate) {
+        return;
+      }
+      sendData({
+        tracker: this.trackerName,
+        element: this.element,
+        value: this.getContent()
+      });
+    },
+
+    _editor: function () {
+      return CKEDITOR.dom.element.get(this.element).getEditor();
+    },
+    
+    getContent: function () {
+      return this._editor().getData();
+    }
+  });
+
+  CKEditor.scan = function () {
+    var result = [];
+    if (typeof CKEDITOR == "undefined") {
+      return;
+    }
+    var editorInstance;
+    for (var instanceIdentifier in CKEDITOR.instances) {
+      editorInstance = document.getElementById(instanceIdentifier) || document.getElementsByName(instanceIdentifier)[0];
+      if (editorInstance) {
+        result.push(editorInstance);
+      }
+    }
+    return $(result);
+  };
+
+  CKEditor.tracked = function (el) {
+    if (typeof CKEDITOR == "undefined") {
+      return false;
+    }
+    el = $(el)[0];
+    return !! (CKEDITOR.dom.element.get(el) && CKEDITOR.dom.element.get(el).getEditor());
+  };
+
+  TogetherJS.addTracker(CKEditor, true /* skip setInit */);
+
+
   function buildTrackers() {
     assert(! liveTrackers.length);
     util.forEachAttr(editTrackers, function (TrackerClass) {
       var els = TrackerClass.scan();
-      $.each(els, function () {
-        liveTrackers.push(new TrackerClass(this));
-      });
+      if (els) {
+        $.each(els, function () {
+          var tracker = new TrackerClass(this);
+          $(this).data("togetherjsHistory", ot.SimpleHistory(session.clientId, tracker.getContent(), 1));
+          liveTrackers.push(tracker);
+        });
+      }
     });
   }
 
@@ -8028,18 +8531,43 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
     }
   }
 
+  function getElementType(el) {
+    el = $(el)[0];
+    if (el.tagName == "TEXTAREA") {
+      return "textarea";
+    }
+    if (el.tagName == "SELECT") {
+      return "select";
+    }
+    if (el.tagName == "INPUT") {
+      return (el.getAttribute("type") || "text").toLowerCase();
+    }
+    return "?";
+  }
+
   function setValue(el, value) {
     el = $(el);
+    var changed = false;
     if (isCheckable(el)) {
-      el.prop("checked", value);
+      var checked = !! el.prop("checked");
+      value = !! value;
+      if (checked != value) {
+        changed = true;
+        el.prop("checked", value);
+      }
     } else {
-      el.val(value);
+      if (el.val() != value) {
+        changed = true;
+        el.val(value);
+      }
     }
-    eventMaker.fireChange(el);
+    if (changed) {
+      eventMaker.fireChange(el);
+    }
   }
 
   /* Send the top of this history queue, if it hasn't been already sent. */
-  function maybeSendUpdate(element, history) {
+  function maybeSendUpdate(element, history, tracker) {
     var change = history.getNextToSend();
     if (! change) {
       /* nothing to send */
@@ -8059,6 +8587,9 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
         }
       }
     };
+    if (tracker) {
+      msg.tracker = tracker;
+    }
     session.send(msg);
   }
 
@@ -8067,20 +8598,18 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
       return;
     }
     var el = $(elementFinder.findElement(msg.element));
+    var tracker;
     if (msg.tracker) {
-      var tracker = getTracker(el, msg.tracker);
+      tracker = getTracker(el, msg.tracker);
       assert(tracker);
-      inRemoteUpdate = true;
-      try {
-        tracker.update(msg);
-      } finally {
-        inRemoteUpdate = false;
-      }
-      return;
     }
-    var text = isText(el);
+    var focusedEl = el[0].ownerDocument.activeElement;
+    var focusedElSelection;
+    if (isText(focusedEl)) {
+      focusedElSelection = [focusedEl.selectionStart, focusedEl.selectionEnd];
+    }
     var selection;
-    if (text) {
+    if (isText(el)) {
       selection = [el[0].selectionStart, el[0].selectionEnd];
     }
     var value;
@@ -8097,7 +8626,11 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
                                          msg.replace.delta.text);
       // apply this change to the history
       var changed = history.commit(msg.replace);
-      maybeSendUpdate(msg.element, history);
+      var trackerName = null;
+      if (typeof tracker != "undefined") {
+        trackerName = tracker.trackerName;
+      }
+      maybeSendUpdate(msg.element, history, trackerName);
       if (! changed) {
         return;
       }
@@ -8108,10 +8641,22 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
     }
     inRemoteUpdate = true;
     try {
-      setValue(el, value);
-      if (text) {
+      if(tracker) {
+        tracker.update({value:value});
+      } else {
+        setValue(el, value);
+      }
+      if (isText(el)) {
         el[0].selectionStart = selection[0];
         el[0].selectionEnd = selection[1];
+      }
+      // return focus to original input:
+      if (focusedEl != el[0]) {
+        focusedEl.focus();
+        if (isText(focusedEl)) {
+          focusedEl.selectionStart = focusedElSelection[0];
+          focusedEl.selectionEnd = focusedElSelection[1];
+        }
       }
     } finally {
       inRemoteUpdate = false;
@@ -8129,14 +8674,16 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
     };
     var els = $("textarea, input, select");
     els.each(function () {
-      if (elementFinder.ignoreElement(this) || elementTracked(this)) {
+      if (elementFinder.ignoreElement(this) || elementTracked(this) ||
+          suppressSync(this)) {
         return;
       }
       var el = $(this);
       var value = getValue(el);
       var upd = {
         element: elementFinder.elementLocation(this),
-        value: value
+        value: value,
+        elementType: getElementType(el)
       };
       if (isText(el)) {
         var history = el.data("togetherjsHistory");
@@ -8149,7 +8696,13 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
     });
     liveTrackers.forEach(function (tracker) {
       var init = tracker.makeInit();
-      assert(tracker.tracked(elementFinder.findElement(init.element)));
+      assert(tracker.tracked(init.element));
+      var history = $(init.element).data("togetherjsHistory");
+      if (history) {
+        init.value = history.committed;
+        init.basis = history.basis;
+      }
+      init.element = elementFinder.elementLocation($(init.element));
       msg.updates.push(init);
     });
     if (msg.updates.length) {
@@ -8204,19 +8757,15 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
         console.warn(e);
         return;
       }
-      if (update.tracker) {
-        var tracker = getTracker(el, update.tracker);
-        assert(tracker);
         inRemoteUpdate = true;
         try {
-          tracker.init(update, msg);
-        } finally {
-          inRemoteUpdate = false;
-        }
-      } else {
-        inRemoteUpdate = true;
-        try {
-          setValue(el, update.value);
+          if (update.tracker) {
+            var tracker = getTracker(el, update.tracker);
+            assert(tracker);
+            tracker.init(update, msg);
+          } else {
+            setValue(el, update.value);
+          }
           if (update.basis) {
             var history = $(el).data("togetherjsHistory");
             // don't overwrite history if we're already up to date
@@ -8233,7 +8782,6 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
         } finally {
           inRemoteUpdate = false;
         }
-      }
     });
   });
 
@@ -8241,7 +8789,7 @@ define('forms',["jquery", "util", "session", "elementFinder", "eventMaker", "tem
 
   function focus(event) {
     var target = event.target;
-    if (elementFinder.ignoreElement(target)) {
+    if (elementFinder.ignoreElement(target) || elementTracked(target)) {
       blur(event);
       return;
     }
@@ -8427,7 +8975,8 @@ define('startup',["util", "require", "jquery", "windowing", "storage"], function
         next();
         return;
       }
-      if (TogetherJS.getConfig("suppressJoinConfirmation")) {
+      TogetherJS.config.close("suppressJoinConfirmation");
+      if (TogetherJS.config.get("suppressJoinConfirmation")) {
         next();
         return;
       }
@@ -8462,8 +9011,9 @@ define('startup',["util", "require", "jquery", "windowing", "storage"], function
     },
 
     share: function (next) {
+      TogetherJS.config.close("suppressInvite");
       if (session.isClient || (! session.firstRun) ||
-          TogetherJS.getConfig("suppressInvite")) {
+          TogetherJS.config.get("suppressInvite")) {
         next();
         return;
       }
@@ -8479,9 +9029,12 @@ define('startup',["util", "require", "jquery", "windowing", "storage"], function
   return startup;
 });
 
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 define('videos',["jquery", "util", "session", "elementFinder"],
-function($, util, session, elementFinder){
+function ($, util, session, elementFinder) {
 
   var listeners = [];
 
@@ -8501,7 +9054,7 @@ function($, util, session, elementFinder){
     var videos = $('video');
     setupMirroredEvents(videos);
     setupTimeSync(videos);
-  };
+  }
 
   function setupMirroredEvents(videos) {
     var currentListener;
@@ -8513,7 +9066,7 @@ function($, util, session, elementFinder){
         listener: currentListener
       });
     });
-  };
+  }
 
   function makeEventSender(eventName) {
     return function (event, options) {
@@ -8526,8 +9079,8 @@ function($, util, session, elementFinder){
           position: element.currentTime
         });
       }
-    }
-  };
+    };
+  }
 
   function setupTimeSync(videos) {
     videos.each(function(i, video) {
@@ -8538,7 +9091,7 @@ function($, util, session, elementFinder){
         listener: onTimeUpdate
       });
     });
-  };
+  }
 
   function makeTimeUpdater() {
     var last = 0;
@@ -8549,7 +9102,7 @@ function($, util, session, elementFinder){
       }
       last = currentTime;
     };
-  };
+  }
 
   function areTooFarApart(currentTime, lastTime) {
     var secDiff = Math.abs(currentTime - lastTime);
@@ -8565,7 +9118,7 @@ function($, util, session, elementFinder){
         videos.off(event.name, event.listener);
     });
     listeners = [];
-  };
+  }
 
 
   session.hub.on('video-timeupdate', function (msg) {
@@ -8576,8 +9129,8 @@ function($, util, session, elementFinder){
     //to help throttle uneccesary position changes
     if(areTooFarApart(oldTime, newTime)){
       setTime(element, msg.position);
-    };
-  })
+    }
+  });
 
   MIRRORED_EVENTS.forEach( function (eventName) {
     session.hub.on("video-"+eventName, function (msg) {
@@ -8587,7 +9140,7 @@ function($, util, session, elementFinder){
 
       element.trigger(eventName, {silent: true});
     });
-  })
+  });
 
   //Currently does not discriminate between visible and invisible videos
   function $findElement(location) {
@@ -8657,7 +9210,10 @@ define('walkthrough',["util", "ui", "jquery", "windowing", "templates", "templat
         container.find(".togetherjs-if-creator").show();
         container.find(".togetherjs-ifnot-creator").remove();
       }
-      container.find(".togetherjs-site-name").text(session.siteName());
+      TogetherJS.config.track("siteName", function (value) {
+        value = value || document.title;
+        container.find(".togetherjs-site-name").text(value);
+      });
       ui.activateAvatarEdit(container, {
         onSave: function () {
           container.find("#togetherjs-avatar-when-saved").show();
@@ -8844,8 +9400,6 @@ define('webrtc',["require", "jquery", "util", "session", "ui", "peers", "storage
   /****************************************
    * getUserMedia Avatar support
    */
-
-  var avatarEditState = {};
 
   session.on("ui-ready", function () {
     $("#togetherjs-self-avatar").click(function () {
@@ -9441,6 +9995,284 @@ define('who',["util", "channels", "session", "ui"], function (util, channels, se
   });
 
   return who;
+});
+
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http:// mozilla.org/MPL/2.0/. */
+
+define('youtubeVideos',["jquery", "util", "session", "elementFinder"],
+function ($, util, session, elementFinder) {
+
+  // constant var to indicate whether two players are too far apart in sync
+  var TOO_FAR_APART = 3000;
+  // embedded youtube iframes
+  var youTubeIframes = [];
+  // youtube API load delay
+  var API_LOADING_DELAY = 2000;
+
+  session.on("reinitialize", function () {
+    if (TogetherJS.config.get("youtube")) {
+      prepareYouTube();
+    }
+  });
+
+  session.on("close", function () {
+    $(youTubeIframes).each(function (i, iframe) {
+      // detach players from iframes
+      $(iframe).removeData("togetherjs-player");
+      $(iframe).removeData("dontPublish");
+      $(iframe).removeData("currentVideoId");
+      // disable iframeAPI
+      $(iframe).removeAttr("enablejsapi");
+      // remove unique youtube iframe indicators
+      var id = $(iframe).attr("id") || "";
+      if (id.indexOf("youtube-player") === 0) {
+        // An id we added
+        $(iframe).removeAttr("id");
+      }
+      youTubeIframes = [];
+    });
+  });
+
+  TogetherJS.config.track("youtube", function (track, previous) {
+    if (track && ! previous) {
+      prepareYouTube();
+      // You can enable youtube dynamically, but can't turn it off:
+      TogetherJS.config.close("youtube");
+    }
+  });
+
+  function prepareYouTube() {
+    // setup iframes first
+    setupYouTubeIframes();
+
+    // this function should be global so it can be called when API is loaded
+    window.onYouTubeIframeAPIReady = function() {
+      // YouTube API is ready
+      $(youTubeIframes).each(function (i, iframe) {
+        var player = new YT.Player(iframe.id, { // get the reference to the already existing iframe
+          events: {
+            'onReady': insertPlayer,
+            'onStateChange': publishPlayerStateChange
+          }
+        });
+      });
+    };
+
+    if (window.YT === undefined) {
+      // load necessary API
+      // it calls onYouTubeIframeAPIReady automatically when the API finishes loading
+      var tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      var firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    } else {
+      // manually invoke APIReady function when the API was already loaded by user
+      onYouTubeIframeAPIReady();
+    }
+
+    // give each youtube iframe a unique id and set its enablejsapi param to true
+    function setupYouTubeIframes() {
+      var iframes = $('iframe');
+      iframes.each(function (i, iframe) {
+        // if the iframe's unique id is already set, skip it
+        // FIXME: what if the user manually sets an iframe's id (i.e. "#my-youtube")?
+        // maybe we should set iframes everytime togetherjs is reinitialized?
+        if (($(iframe).attr("src") || "").indexOf("youtube") != -1 && !$(iframe).attr("id")) {
+          $(iframe).attr("id", "youtube-player"+i);
+          $(iframe).attr("enablejsapi", 1);
+          youTubeIframes[i] = iframe;
+        }
+      });
+    } // iframes are ready
+
+    function insertPlayer(event) {
+      // only when it is READY, attach a player to its iframe
+      var currentPlayer = event.target;
+      var currentIframe = currentPlayer.a;
+      // check if a player is already attached in case of being reinitialized
+      if (!$(currentIframe).data("togetherjs-player")) {
+        $(currentIframe).data("togetherjs-player", currentPlayer);
+        // initialize its dontPublish flag as well
+        $(currentIframe).data("dontPublish", false);
+        // store its current video's id
+        var currentVideoId = getVideoIdFromUrl(currentPlayer.getVideoUrl());
+        $(currentIframe).data("currentVideoId", currentVideoId);
+      }
+    }
+  } // end of prepareYouTube
+
+  function publishPlayerStateChange(event) {
+    var target = event.target; 
+    var currentIframe = target.a;
+    // FIXME: player object retrieved from event.target has an incomplete set of essential functions
+    // this is most likely due to a recently-introduced problem with current YouTube API as others have been reporting the same issue (12/18/`13)
+    //var currentPlayer = target;
+    //var currentTime = currentPlayer.getCurrentTime();
+    var currentPlayer = $(currentIframe).data("togetherjs-player");
+    var currentTime = target.k.currentTime;
+    var iframeLocation = elementFinder.elementLocation(currentIframe);
+
+    if ($(currentPlayer).data("seek")) {
+      $(currentPlayer).removeData("seek");
+      return;
+    }
+
+    // do not publish if playerState was changed by other users
+    if ($(currentIframe).data("dontPublish")) {
+      // make it false again so it can start publishing events of its own state changes
+      $(currentIframe).data("dontPublish", false);
+      return;
+    }
+
+    // notify other people that I changed the player state
+    if (event.data == YT.PlayerState.PLAYING) {
+
+      var currentVideoId = isDifferentVideoLoaded(currentIframe);
+      if (currentVideoId) {
+        // notify that I just loaded another video
+        publishDifferentVideoLoaded(iframeLocation, currentVideoId);
+        // update current video id
+        $(currentIframe).data("currentVideoId", currentVideoId);
+      } else {
+        session.send({
+          type: "playerStateChange",
+          element: iframeLocation,
+          playerState: 1,
+          playerTime: currentTime
+        });
+      }
+    } else if (event.data == YT.PlayerState.PAUSED) {
+      session.send({
+        type: "playerStateChange",
+        element: iframeLocation,
+        playerState: 2,
+        playerTime: currentTime
+      });
+    } else {
+      // do nothing when the state is buffering, cued, or ended
+      return;
+    }
+  }
+
+  function publishDifferentVideoLoaded(iframeLocation, videoId) {
+    session.send({
+      type: "differentVideoLoaded",
+      videoId: videoId,
+      element: iframeLocation
+    });
+  }
+
+  session.hub.on('playerStateChange', function (msg) {
+    var iframe = elementFinder.findElement(msg.element);
+    var player = $(iframe).data("togetherjs-player");
+    var currentTime = player.getCurrentTime();
+    var currentState = player.getPlayerState();
+
+    if (currentState != msg.playerState) {
+      $(iframe).data("dontPublish", true);
+    }
+
+    if (msg.playerState == 1) {
+      player.playVideo();
+      // seekTo() updates the video's time and plays it if it was already playing
+      // and pauses it if it was already paused
+      if (areTooFarApart(currentTime, msg.playerTime)) {
+        player.seekTo(msg.playerTime, true);
+      }
+    } else if (msg.playerState == 2) {
+      // When YouTube videos are advanced while playing,
+      // Chrome: pause -> pause -> play (onStateChange is called even when it is from pause to pause)
+      // FireFox: buffering -> play -> buffering -> play
+      // We must prevent advanced videos from going out of sync
+      player.pauseVideo();
+      if (areTooFarApart(currentTime, msg.playerTime)) {
+        // "seek" flag will help supress publishing unwanted state changes
+        $(player).data("seek", true);
+        player.seekTo(msg.playerTime, true);
+      }
+    }
+  });
+
+  // if a late user joins a channel, synchronize his videos
+  session.hub.on('hello', function () {
+    // wait a couple seconds to make sure the late user has finished loading API
+    setTimeout(synchronizeVideosOfLateGuest, API_LOADING_DELAY);
+  });
+
+  session.hub.on('synchronizeVideosOfLateGuest', function (msg) {
+    var iframe = elementFinder.findElement(msg.element);
+    var player = $(iframe).data("togetherjs-player");
+    // check if another video had been loaded to an existing iframe before I joined
+    var currentVideoId = $(iframe).data("currentVideoId");
+    if (msg.videoId != currentVideoId) {
+      $(iframe).data("currentVideoId", msg.videoId);
+      player.loadVideoById(msg.videoId, msg.playerTime, 'default');
+    } else {
+      // if the video is only cued, I do not have to do anything to sync
+      if (msg.playerState != 5) {
+        player.seekTo(msg.playerTime, true);
+      }
+    }
+  });
+
+  session.hub.on('differentVideoLoaded', function (msg) {
+    // load a new video if the host has loaded one
+    var iframe = elementFinder.findElement(msg.element);
+    var player = $(iframe).data("togetherjs-player");
+    player.loadVideoById(msg.videoId, 0, 'default');
+    $(iframe).data("currentVideoId", msg.videoId);
+
+  });
+
+  function synchronizeVideosOfLateGuest() {
+    youTubeIframes.forEach(function (iframe) {
+      var currentPlayer = $(iframe).data("togetherjs-player");
+      var currentVideoId = getVideoIdFromUrl(currentPlayer.getVideoUrl());
+      var currentState = currentPlayer.getPlayerState();
+      var currentTime = currentPlayer.getCurrentTime();
+      var iframeLocation = elementFinder.elementLocation(iframe);
+      session.send({
+        type: "synchronizeVideosOfLateGuest",
+        element: iframeLocation,
+        videoId: currentVideoId,
+        playerState: currentState, //this might be necessary later
+        playerTime: currentTime
+      });
+    });
+  }
+
+  function isDifferentVideoLoaded(iframe) {
+    var lastVideoId = $(iframe).data("currentVideoId");
+    var currentPlayer = $(iframe).data("togetherjs-player");
+    var currentVideoId = getVideoIdFromUrl(currentPlayer.getVideoUrl());
+
+    // since url forms of iframe src and player's video url are different,
+    // I have to compare the video ids
+    if (currentVideoId != lastVideoId) {
+      return currentVideoId;
+    } else {
+      return false;
+    }
+  }
+
+  // parses videoId from the url returned by getVideoUrl function
+  function getVideoIdFromUrl(videoUrl) {
+    var videoId = videoUrl.split('v=')[1];
+    //Chrome and Firefox have different positions for parameters
+    var ampersandIndex = videoId.indexOf('&');
+    if (ampersandIndex != -1) {
+      videoId = videoId.substring(0, ampersandIndex);
+    }
+    return videoId;
+  }
+
+  function areTooFarApart(myTime, theirTime) {
+    var secDiff = Math.abs(myTime - theirTime);
+    var milliDiff = secDiff * 1000;
+    return milliDiff > TOO_FAR_APART;
+  }
 });
 TogetherJS.require = TogetherJS._requireObject = require;
 TogetherJS._loaded = true;

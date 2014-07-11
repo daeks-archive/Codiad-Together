@@ -470,6 +470,7 @@ input.togetherjs-upload-avatar {
 }
 .togetherjs #togetherjs-chat-input {
   width: 264px;
+  min-height: 20px;
   height: 20px;
   overflow-x: hidden;
   overflow-y: hidden;

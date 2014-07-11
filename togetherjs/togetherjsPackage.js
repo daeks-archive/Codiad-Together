@@ -7245,12 +7245,12 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
       var offset = $(element).offset();
       var offsetX = event.pageX - offset.left;
       var offsetY = event.pageY - offset.top;
-      /*session.send({
+      session.send({
         type: "cursor-click",
         element: location,
         offsetX: offsetX,
         offsetY: offsetY
-      });*/
+      });
       if (util.matchElement(element, dontShowClicks)) {
         return;
       }
@@ -7287,7 +7287,7 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
     if (util.matchElement(target, dontShowClicks)) {
       return;
     }
-    displayClick({top: top, left: left}, pos.peer.color);
+    //displayClick({top: top, left: left}, pos.peer.color);
   });
 
   function displayClick(pos, color) {

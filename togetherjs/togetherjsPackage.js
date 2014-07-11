@@ -6827,17 +6827,18 @@ define('cursor',["jquery", "ui", "util", "session", "elementFinder", "tinycolor"
   var Cursor = util.Class({
 
     constructor: function (clientId) {
-      /*this.clientId = clientId;
+      this.clientId = clientId;
       this.element = templating.clone("cursor");
       this.elementClass = "togetherjs-scrolled-normal";
       this.element.addClass(this.elementClass);
       this.updatePeer(peers.getPeer(clientId));
       this.lastTop = this.lastLeft = null;
+      this.element.style.display = 'none';
       $(document.body).append(this.element);
       this.element.animateCursorEntry();
       this.keydownTimeout = null;
       this.clearKeydown = this.clearKeydown.bind(this);
-      this.atOtherUrl = false;*/
+      this.atOtherUrl = false;
     },
 
     // How long after receiving a setKeydown call that we should show the

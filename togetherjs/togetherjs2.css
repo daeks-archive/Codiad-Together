@@ -147,11 +147,11 @@ http://yuilibrary.com/license/
   font-weight: normal;
 }
 .togetherjs a {
-  color: #474747;
+  color: #0095DD;
   text-decoration: none;
 }
 .togetherjs a:hover {
-  color: #474747;
+  color: #0095DD;
   text-decoration: underline;
 }
 .togetherjs p {
@@ -344,7 +344,7 @@ input.togetherjs-upload-avatar {
   background: linear-gradient(to bottom, #999999 0%, #888888 100%);
   /* W3C */
 
-  color: #000;
+  color: #fff;
 }
 .togetherjs-cancel {
   display: inline-block;
@@ -385,14 +385,14 @@ input.togetherjs-upload-avatar {
   border-top: 1px solid rgba(0, 0, 0, 0.2);
 }
 .togetherjs #togetherjs-buttons .togetherjs-button:hover {
-  background-color: #474747;
+  background-color: #0F81BF;
 }
 .togetherjs #togetherjs-buttons hr {
   padding: 0;
   margin: 0;
 }
 .togetherjs #togetherjs-dock-participants button.togetherjs-active {
-  background-color: #474747 !important;
+  background-color: #0F81BF !important;
 }
 .togetherjs #togetherjs-buttons #togetherjs-share-button {
   background-image: url('./images/button-share.png');
@@ -402,21 +402,21 @@ input.togetherjs-upload-avatar {
 }
 .togetherjs #togetherjs-buttons #togetherjs-share-button.togetherjs-active {
   background-image: url('./images/button-share-active.png') !important;
-  background-color: #474747;
+  background-color: #0F81BF;
 }
 .togetherjs #togetherjs-buttons #togetherjs-audio-button {
   background-image: url('./images/button-mic.png');
 }
 .togetherjs #togetherjs-buttons #togetherjs-audio-button:hover {
   background-image: url('./images/button-mic-active.png');
-  /*background-color:#474747;*/
+  /*background-color:#0095dd;*/
 
   /*cursor: default;*/
 
 }
 .togetherjs #togetherjs-buttons #togetherjs-audio-button.togetherjs-active {
   background-image: url('./images/button-mic-active.png') !important;
-  background-color: #474747;
+  background-color: #0F81BF;
 }
 .togetherjs #togetherjs-buttons #togetherjs-chat-button {
   background-image: url('./images/button-chat.png');
@@ -426,7 +426,7 @@ input.togetherjs-upload-avatar {
 }
 .togetherjs #togetherjs-buttons #togetherjs-chat-button.togetherjs-active {
   background-image: url('./images/button-chat-active.png') !important;
-  background-color: #474747;
+  background-color: #0F81BF;
 }
 .togetherjs #togetherjs-dock-anchor {
   height: 20px;
@@ -444,17 +444,16 @@ input.togetherjs-upload-avatar {
   border-top-right-radius: 4px;
 }
 .togetherjs .togetherjs-subtitle {
-  background: #A4A4A4;
+  background: #0195DD;
   width: 280px;
   height: 17px;
-  border-bottom: 1px solid #FFFFFF;
+  border-bottom: 1px solid #0071A7;
   color: rgba(255, 255, 255, 0.5);
   font-size: 12px;
   padding: 7px 10px;
   left: -14px;
   top: -15px;
   position: relative;
-
 }
 .togetherjs .togetherjs-subtitle #togetherjs-chat-participants {
   font-size: 12px;
@@ -483,7 +482,7 @@ input.togetherjs-upload-avatar {
   font-family: openSansLight, Helvetica, sans-serif;
 }
 .togetherjs #togetherjs-chat-input:focus {
-  border: 1px solid #474747;
+  border: 1px solid #0095DD;
 }
 .togetherjs #togetherjs-chat-input-box {
   margin: 0;
@@ -594,10 +593,10 @@ input.togetherjs-upload-avatar {
   margin: 0 -7px 0 -7px;
   padding: 10px 4px 5px 30px;
   height: 24px;
-  background: #474747;
+  background: #0095DD;
   border-radius: 4px 4px 0 0;
   position: relative;
-  border-bottom: 1px solid #FFFFFF;
+  border-bottom: 1px solid #0071A7;
 }
 .togetherjs .togetherjs-window .togetherjs-share-link {
   width: 256px;
@@ -610,14 +609,14 @@ input.togetherjs-upload-avatar {
   margin: 7px 0px;
 }
 .togetherjs .togetherjs-window .togetherjs-share-link:focus {
-  border: 1px solid #474747;
+  border: 1px solid #0095DD;
 }
 .togetherjs .togetherjs-window header button.togetherjs-close {
   background-color: inherit;
   border: none;
   padding: 0;
   margin: 0;
-  border-left: 1px solid #FFFFFF;
+  border-left: 1px solid #0071A7;
   float: right;
   font-weight: bold;
   cursor: pointer;
@@ -650,10 +649,10 @@ input.togetherjs-upload-avatar {
   margin: 0 -1px 0 -1px;
   padding: 10px 4px 5px 30px;
   height: 24px;
-  background: #474747;
+  background: #0095DD;
   border-radius: 4px 4px 0 0;
   position: relative;
-  border-bottom: 1px solid #FFFFFF;
+  border-bottom: 1px solid #0071A7;
 }
 .togetherjs #togetherjs-feedback-form.togetherjs-modal {
   background-color: #fff;
@@ -718,10 +717,10 @@ input.togetherjs-upload-avatar {
   margin: 0 -7px 0 -7px;
   padding: 10px 4px 5px 30px;
   height: 24px;
-  background: #474747;
+  background: #0095DD;
   border-radius: 4px 4px 0 0;
   position: relative;
-  border-bottom: 1px solid #FFFFFF;
+  border-bottom: 1px solid #0071A7;
 }
 .togetherjs .togetherjs-notification .togetherjs-share-link {
   width: 256px;
@@ -734,14 +733,14 @@ input.togetherjs-upload-avatar {
   margin: 7px 0px;
 }
 .togetherjs .togetherjs-notification .togetherjs-share-link:focus {
-  border: 1px solid #474747;
+  border: 1px solid #0095DD;
 }
 .togetherjs .togetherjs-notification header button.togetherjs-close {
   background-color: inherit;
   border: none;
   padding: 0;
   margin: 0;
-  border-left: 1px solid #FFFFFF;
+  border-left: 1px solid #0071A7;
   float: right;
   font-weight: bold;
   cursor: pointer;
@@ -1071,10 +1070,10 @@ input.togetherjs-upload-avatar {
   margin: -2px 0px;
 }
 #togetherjs-menu .togetherjs-self-name:focus {
-  border: 1px solid #474747;
+  border: 1px solid #0095DD;
 }
 #togetherjs-menu .togetherjs-self-name:focus {
-  border-bottom: 1px solid #474747;
+  border-bottom: 1px solid #0095DD;
 }
 /*Participant windows*/
 #togetherjs-participantlist.togetherjs-window {
@@ -1199,7 +1198,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 #togetherjs-dock {
   position: fixed;
   z-index: 10000;
-  background-color: #474747;
+  background-color: #0095dd;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   /*border:1px solid #000;*/
 
@@ -1207,8 +1206,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 #togetherjs-dock.togetherjs-dock-right {
   padding: 0;
   bottom: 150px;
-  right: 15px;
-  top: 35px;
+  right: 5px;
   border-radius: 4px;
   height: 260px;
   width: 60px;
@@ -1303,7 +1301,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 }
 .togetherjs-cursor {
   position: absolute;
-  z-index: 999999;
+  z-index: 9999;
   font-size: 28px;
   font-weight: bolder;
   /* This magic CSS rule makes this element basically invisible to clicks/etc:
@@ -1376,7 +1374,7 @@ section.togetherjs-buttons .togetherjs-same-url {
 }
 .togetherjs-click {
   position: absolute;
-  z-index: 999998;
+  z-index: 9998;
   pointer-events: none;
   width: 10px;
   height: 10px;
@@ -1446,10 +1444,10 @@ section.togetherjs-buttons .togetherjs-same-url {
   margin: 0 -7px 0 -7px;
   padding: 10px 4px 5px 30px;
   height: 24px;
-  background: #474747;
+  background: #0095DD;
   border-radius: 4px 4px 0 0;
   position: relative;
-  border-bottom: 1px solid #FFFFFF;
+  border-bottom: 1px solid #0071A7;
 }
 .togetherjs .togetherjs-modal .togetherjs-share-link {
   width: 256px;
@@ -1462,14 +1460,14 @@ section.togetherjs-buttons .togetherjs-same-url {
   margin: 7px 0px;
 }
 .togetherjs .togetherjs-modal .togetherjs-share-link:focus {
-  border: 1px solid #474747;
+  border: 1px solid #0095DD;
 }
 .togetherjs .togetherjs-modal header button.togetherjs-close {
   background-color: inherit;
   border: none;
   padding: 0;
   margin: 0;
-  border-left: 1px solid #FFFFFF;
+  border-left: 1px solid #0071A7;
   float: right;
   font-weight: bold;
   cursor: pointer;
@@ -1735,7 +1733,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: inset 0 0 2px #474747;
+    box-shadow: inset 0 0 2px #0095dd;
   }
   100% {
     box-shadow: none;
@@ -1746,7 +1744,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: inset 0 0 2px #474747;
+    box-shadow: inset 0 0 2px #0095dd;
   }
   100% {
     box-shadow: none;
@@ -1757,7 +1755,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: inset 0 0 2px #474747;
+    box-shadow: inset 0 0 2px #0095dd;
   }
   100% {
     box-shadow: none;
@@ -1768,7 +1766,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: inset 0 0 2px #474747;
+    box-shadow: inset 0 0 2px #0095dd;
   }
   100% {
     box-shadow: none;
@@ -1785,7 +1783,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: 0 0 5px #474747;
+    box-shadow: 0 0 5px #0095dd;
   }
   100% {
     box-shadow: none;
@@ -1796,7 +1794,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: 0 0 5px #474747;
+    box-shadow: 0 0 5px #0095dd;
   }
   100% {
     box-shadow: none;
@@ -1807,7 +1805,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: 0 0 5px #474747;
+    box-shadow: 0 0 5px #0095dd;
   }
   100% {
     box-shadow: none;
@@ -1818,7 +1816,7 @@ section.togetherjs-buttons .togetherjs-same-url {
     box-shadow: none;
   }
   50% {
-    box-shadow: 0 0 5px #474747;
+    box-shadow: 0 0 5px #0095dd;
   }
   100% {
     box-shadow: none;
